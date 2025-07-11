@@ -316,7 +316,6 @@ impl fmt::Display for ServiceEvent {
 mod tests {
     use super::*;
     use crate::types::ProtocolType;
-    use std::net::{IpAddr, Ipv4Addr};
 
     #[test]
     fn test_service_creation() -> Result<(), crate::error::DiscoveryError> {

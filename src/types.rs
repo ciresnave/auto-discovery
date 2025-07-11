@@ -84,7 +84,7 @@ impl ServiceType {
     /// Create a new service type with specified protocol
     pub fn with_protocol<S: Into<String>>(service: S, protocol: S) -> Result<Self> {
         let mut protocol_str = protocol.into();
-        if !protocol_str.starts_with('_') {
+        if !protocol_str.starts_with("_") {
             protocol_str = format!("_{}", protocol_str);
         }
 
@@ -343,7 +343,6 @@ impl Default for DiscoveryFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
     fn test_service_type() -> Result<()> {
@@ -374,7 +373,6 @@ mod tests {
 
     #[test] 
     fn test_discovery_filter() -> Result<()> {
-        use std::net::{IpAddr, Ipv4Addr};
         use crate::service::ServiceInfo;
         
         let filter = DiscoveryFilter::new()

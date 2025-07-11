@@ -264,12 +264,14 @@ mod tests {
     async fn test_tsig_algorithm_support() {
         let manager = Arc::new(TsigKeyManager::new(Duration::from_secs(60)));
         
-        for algorithm in &{
+        let algorithms = [
             TsigAlgorithm::HmacSha1,
             TsigAlgorithm::HmacSha256,
             TsigAlgorithm::HmacSha384,
             TsigAlgorithm::HmacSha512,
-        } {
+        ];
+        
+        for algorithm in &algorithms {
             let key = TsigKey::new(
                 "test.key.",
                 *algorithm,
