@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo as MdnsServiceInfo};
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr},
     sync::Arc,
     time::Duration,
 };
@@ -150,7 +149,7 @@ impl super::DiscoveryProtocol for MdnsProtocol {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::Ipv4Addr;
+    use std::net::{IpAddr, Ipv4Addr};
 
     #[tokio::test]
     async fn test_mdns_protocol() {
