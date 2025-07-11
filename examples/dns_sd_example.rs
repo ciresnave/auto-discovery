@@ -1,0 +1,1 @@
+use auto_discovery::{discovery::ServiceDiscovery, config::DiscoveryConfig}; use std::time::Duration; #[tokio::main] async fn main() -> Result<(), Box<dyn std::error::Error>> { let config = DiscoveryConfig::new(); let _discovery = ServiceDiscovery::new(config).await?; println!("DNS-SD example running"); tokio::time::sleep(Duration::from_secs(1)).await; Ok(()) }

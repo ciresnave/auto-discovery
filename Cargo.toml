@@ -1,0 +1,85 @@
+[package]
+name = "auto-discovery"
+version = "0.1.0"
+edition = "2021"
+authors = ["Eric Evans <ciresnave@gmail.com>"]
+description = "A general-purpose network and system service discovery library for Rust applications"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ciresnave/auto-discovery"
+keywords = ["network", "discovery", "mdns", "service", "upnp"]
+categories = ["network-programming", "asynchronous"]
+readme = "README.md"
+
+[features]
+default = ["metrics", "secure", "dns-sd", "mdns", "upnp"]
+metrics = ["dep:metrics", "dep:metrics-exporter-prometheus", "dep:tokio-metrics"]
+secure = ["dep:ring", "dep:x509-parser", "dep:rustls"]
+testing = ["dep:tempfile"]
+dns-sd = ["trust-dns-client/dnssec"]
+mdns = ["dep:mdns-sd"]
+upnp = ["dep:reqwest", "dep:quick-xml"]
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+socket2 = "0.5"
+trust-dns-resolver = "0.23"
+trust-dns-client = { version = "0.23", features = ["dnssec"], optional = true }
+trust-dns-proto = "0.23"
+mdns-sd = { version = "0.11", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+tracing = "0.1"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+async-trait = "0.1"
+reqwest = { version = "0.11", features = ["json"], optional = true }
+quick-xml = { version = "0.31", features = ["serialize"], optional = true }
+rand = "0.8"
+
+# Security and verification
+ring = { version = "0.17", optional = true }
+x509-parser = { version = "0.15", optional = true }
+rustls = { version = "0.21", optional = true }
+base64 = "0.21"
+hex = "0.4"
+
+# Additional networking
+tokio-util = { version = "0.7", features = ["net"] }
+bytes = "1.5"
+
+# Production safety and monitoring
+governor = "0.6"
+backoff = "0.4"
+metrics = { version = "0.21", optional = true }
+metrics-exporter-prometheus = { version = "0.12", optional = true }
+tokio-metrics = { version = "0.3", optional = true }
+tempfile = { version = "3.8", optional = true }
+
+# Health monitoring and load balancing
+hyper = { version = "0.14", features = ["full"] }
+tower = { version = "0.4", features = ["full"] }
+
+[dev-dependencies]
+mockall = "0.12"
+tokio-test = "0.4"
+tempfile = "3.8"
+test-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+proptest = "1.3"
+rand = "0.8"
+
+[workspace]
+members = []
+resolver = "2"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+lto = true
+codegen-units = 1
