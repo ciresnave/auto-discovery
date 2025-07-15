@@ -5,6 +5,7 @@ use crate::{
     service::ServiceInfo,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+#[cfg(feature = "secure")]
 use ring::signature::{self, KeyPair, Ed25519KeyPair};
 use std::time::{SystemTime, UNIX_EPOCH};
 

@@ -8,6 +8,7 @@ use std::{
     time::SystemTimeError,
 };
 use base64::DecodeError;
+#[cfg(feature = "secure")]
 use ring::error::{KeyRejected, Unspecified};
 
 /// The primary error type for the auto-discovery crate
@@ -107,12 +108,14 @@ impl From<DecodeError> for DiscoveryError {
     }
 }
 
+#[cfg(feature = "secure")]
 impl From<Unspecified> for DiscoveryError {
     fn from(err: Unspecified) -> Self {
         Self::Security(err.to_string())
     }
 }
 
+#[cfg(feature = "secure")]
 impl From<KeyRejected> for DiscoveryError {
     fn from(err: KeyRejected) -> Self {
         Self::Security(err.to_string())

@@ -15,8 +15,8 @@ pub mod mdns;
 pub mod upnp;
 pub mod dns_sd;
 
-#[cfg(feature = "simple-mdns")]
-pub mod simple_mdns;
+// #[cfg(feature = "simple-mdns")]
+// pub mod simple_mdns; // Disabled due to API incompatibilities
 
 /// Trait for service discovery protocols
 #[async_trait]
@@ -88,17 +88,18 @@ impl ProtocolManager {
             }
         }
 
-        #[cfg(feature = "simple-mdns")]
-        {
-            if config.has_protocol(ProtocolType::Mdns) {
-                if let Ok(simple_mdns) = simple_mdns::SimpleMdnsProtocol::new(&config).await {
-                    protocols.insert(
-                        ProtocolType::Mdns,
-                        Arc::new(simple_mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>,
-                    );
-                }
-            }
-        }
+        // simple-mdns implementation is disabled due to API incompatibilities
+        // #[cfg(feature = "simple-mdns")]
+        // {
+        //     if config.has_protocol(ProtocolType::Mdns) {
+        //         if let Ok(simple_mdns) = simple_mdns::SimpleMdnsProtocol::new(&config).await {
+        //             protocols.insert(
+        //                 ProtocolType::Mdns,
+        //                 Arc::new(simple_mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>,
+        //             );
+        //         }
+        //     }
+        // }
 
         Ok(Self { config, protocols })
     }

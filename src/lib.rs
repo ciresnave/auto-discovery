@@ -195,6 +195,7 @@ pub mod service;
 pub mod simple;  // Simple API for common use cases
 pub mod types;
 pub mod utils;
+#[cfg(feature = "secure")]
 pub mod security;
 
 // Re-export main types for convenience

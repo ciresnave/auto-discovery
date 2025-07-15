@@ -1,6 +1,6 @@
 [package]
 name = "auto-discovery"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Eric Evans <ciresnave@gmail.com>"]
 description = "A general-purpose network and system service discovery library for Rust applications"
@@ -11,7 +11,7 @@ categories = ["network-programming", "asynchronous"]
 readme = "README.md"
 
 [features]
-default = ["metrics", "secure", "dns-sd", "mdns-sd", "upnp"]
+default = ["metrics", "dns-sd", "mdns-sd", "upnp"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus", "dep:tokio-metrics"]
 secure = ["dep:ring", "dep:x509-parser", "dep:native-tls"]
 testing = ["dep:tempfile"]
@@ -65,6 +65,7 @@ tempfile = { version = "3.8", optional = true }
 # Health monitoring and load balancing
 hyper = { version = "1.6", features = ["full"] }
 tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["full"] }
 flume = "0.11.1"
 url = "2.5.4"
 
