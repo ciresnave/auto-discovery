@@ -13,7 +13,7 @@ readme = "README.md"
 [features]
 default = ["metrics", "secure", "dns-sd", "mdns-sd", "upnp"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus", "dep:tokio-metrics"]
-secure = ["dep:ring", "dep:x509-parser", "dep:rustls"]
+secure = ["dep:ring", "dep:x509-parser", "dep:native-tls"]
 testing = ["dep:tempfile"]
 dns-sd = ["trust-dns-client/dnssec"]
 mdns-sd = ["dep:mdns-sd"]
@@ -39,14 +39,14 @@ tracing = "0.1"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", features = ["json"], optional = true }
+reqwest = { version = "0.12", features = ["json", "native-tls"], optional = true }
 quick-xml = { version = "0.38", features = ["serialize"], optional = true }
 rand = "0.9"
 
 # Security and verification
 ring = { version = "0.17", optional = true }
 x509-parser = { version = "0.17", optional = true }
-rustls = { version = "0.23", optional = true }
+native-tls = { version = "0.2", optional = true }
 base64 = "0.22"
 hex = "0.4"
 

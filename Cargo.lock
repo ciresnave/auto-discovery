@@ -397,12 +397,12 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "mockall",
+ "native-tls",
  "proptest",
  "quick-xml",
  "rand 0.9.1",
  "reqwest",
  "ring",
- "rustls",
  "serde",
  "simple-mdns",
  "socket2 0.6.0",
@@ -2691,7 +2691,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2491382039b29b9b11ff08b76ff6c97cf287671dbb74f0be44bda389fffe9bd1"
 dependencies = [
  "aws-lc-rs",
- "log",
  "once_cell",
  "rustls-pki-types",
  "rustls-webpki",
