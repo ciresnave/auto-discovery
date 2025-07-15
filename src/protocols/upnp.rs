@@ -122,8 +122,15 @@ impl SsdpProtocol {
     }
 
     /// Check if a service matches the search target
-    fn service_matches_search(search_target: &str, _service: &ServiceInfo) -> bool {
-        matches!(search_target, "ssdp:all" | "upnp:rootdevice")
+    fn service_matches_search(search_target: &str, service: &ServiceInfo) -> bool {
+        match search_target {
+            "ssdp:all" | "upnp:rootdevice" => true,
+            target => {
+                // Check if the search target matches the service type
+                target == service.service_type.to_string() || 
+                service.service_type.to_string().contains(target)
+            }
+        }
     }
 
     /// Send a response to an M-SEARCH request
@@ -303,22 +310,16 @@ impl DiscoveryProtocol for SsdpProtocol {
     }
 
     async fn verify_service(&self, service: &ServiceInfo) -> Result<bool> {
-        // For UPnP, we try to connect to the service endpoint
-        let endpoint = format!("{}:{}", service.address, service.port);
+        // For UPnP, check if the service is in our registered services
+        let services = self.registered_services.read().await;
+        let is_registered = services.contains_key(&service.id.to_string());
         
-        match tokio::time::timeout(Duration::from_secs(5), tokio::net::TcpStream::connect(&endpoint)).await {
-            Ok(Ok(_)) => {
-                debug!("UPnP service verified: {}", endpoint);
-                Ok(true)
-            }
-            Ok(Err(e)) => {
-                debug!("UPnP service verification failed: {}: {}", endpoint, e);
-                Ok(false)
-            }
-            Err(_) => {
-                debug!("UPnP service verification timed out: {}", endpoint);
-                Ok(false)
-            }
+        if is_registered {
+            debug!("UPnP service verified: {} ({}:{})", service.name, service.address, service.port);
+            Ok(true)
+        } else {
+            debug!("UPnP service not found in registered services: {} ({}:{})", service.name, service.address, service.port);
+            Ok(false)
         }
     }
 

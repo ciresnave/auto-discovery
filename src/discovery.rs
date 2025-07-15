@@ -113,8 +113,11 @@ impl ServiceDiscovery {
     ///     Some(ProtocolType::Mdns)
     /// ).await?;
     /// 
-    /// // Discover all configured services using any protocol
-    /// let all_services = discovery.discover_services_filtered(None, None).await?;
+    /// // Discover HTTP services using any protocol
+    /// let all_services = discovery.discover_services_filtered(
+    ///     Some(vec![ServiceType::new("_http._tcp")?]), 
+    ///     None
+    /// ).await?;
     /// # Ok(())
     /// # }
     /// ```

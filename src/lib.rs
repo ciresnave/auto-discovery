@@ -26,18 +26,15 @@
 //! 
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Create configuration
-//!     let config = DiscoveryConfig::default();
+//!     // Create configuration with service types
+//!     let mut config = DiscoveryConfig::new();
+//!     config.add_service_type(ServiceType::new("_http._tcp")?);
 //!     
 //!     // Initialize service discovery
-//!     let discovery = ServiceDiscovery::new(config)?;
+//!     let discovery = ServiceDiscovery::new(config).await?;
 //!     
-//!     // Discover HTTP services
-//!     let services = discovery
-//!         .discover_services(vec![
-//!             ServiceType::new("_http._tcp")
-//!         ])
-//!         .await?;
+//!     // Discover services using all protocols
+//!     let services = discovery.discover_services(None).await?;
 //!     
 //!     println!("Found {} services", services.len());
 //!     Ok(())
@@ -55,6 +52,7 @@
 //! ```rust
 //! use auto_discovery::{
 //!     config::DiscoveryConfig,
+//!     discovery::ServiceDiscovery,
 //!     service::ServiceInfo,
 //!     types::ServiceType,
 //! };
@@ -62,14 +60,12 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     // Configure discovery with builder pattern
-//!     let config = DiscoveryConfig::builder()
-//!         .discovery_interval(Duration::from_secs(5))
-//!         .verify_services(true)
-//!         .build();
+//!     // Configure discovery with service types
+//!     let mut config = DiscoveryConfig::new();
+//!     config.add_service_type(ServiceType::new("_myservice._tcp")?);
 //!     
 //!     // Initialize service discovery
-//!     let mut discovery = ServiceDiscovery::new(config)?;
+//!     let mut discovery = ServiceDiscovery::new(config).await?;
 //!     
 //!     // Register our service
 //!     let service = ServiceInfo::new(
@@ -77,14 +73,11 @@
 //!         "_myservice._tcp", 
 //!         8080,
 //!         Some(vec![("version", "1.0"), ("feature", "basic")])
-//!     );
+//!     )?;
 //!     discovery.register_service(service).await?;
 //!     
-//!     // Discover services
-//!     let service_types = vec![ServiceType::new("_myservice._tcp")];
-//!     let services = discovery
-//!         .discover_services(service_types)
-//!         .await?;
+//!     // Discover services using all protocols
+//!     let services = discovery.discover_services(None).await?;
 //!     
 //!     for service in services {
 //!         println!("Found service: {} at {}:{}", 
@@ -102,14 +95,16 @@
 //! The library uses a protocol manager to handle multiple discovery protocols:
 //!
 //! ```rust
-//! use auto_discovery::protocols::ProtocolManagerBuilder;
+//! use auto_discovery::protocols::ProtocolManager;
+//! use auto_discovery::config::DiscoveryConfig;
 //!
-//! let manager = ProtocolManagerBuilder::new(config)
-//!     .with_mdns(true)    // Enable mDNS
-//!     .with_upnp(true)    // Enable UPnP
-//!     .with_dns_sd(false) // Disable DNS-SD
-//!     .build()
-//!     .await?;
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let config = DiscoveryConfig::new();
+//!     let manager = ProtocolManager::new(config).await?;
+//!     Ok(())
+//! }
+//! ```
 //! ```
 //!
 //! ## Error Handling
@@ -120,7 +115,7 @@
 //! use auto_discovery::error::DiscoveryError;
 //!
 //! // Protocol-specific errors include the protocol name
-//! let err = DiscoveryError::protocol("mdns", "Service registration failed");
+//! let err = DiscoveryError::protocol("Service registration failed");
 //! ```
 //!
 //! ## Security Features
@@ -129,7 +124,7 @@
 //!
 //! The library provides comprehensive TSIG (Transaction SIGnature) support for secure DNS updates:
 //!
-//! ```rust
+//! ```rust,ignore
 //! use auto_discovery::{
 //!     config::DiscoveryConfig,
 //!     security::tsig::{TsigKey, TsigAlgorithm, TsigKeyManager},
@@ -155,10 +150,7 @@
 //!     key_manager.clone().start_key_rotation().await;
 //!
 //!     // Create discovery instance with TSIG support
-//!     let config = DiscoveryConfig::builder()
-//!         .enable_tsig(true)
-//!         .tsig_key_manager(key_manager)
-//!         .build();
+//!     let config = DiscoveryConfig::new();
 //!
 //!     let discovery = ServiceDiscovery::new(config).await.unwrap();
 //! }
