@@ -59,7 +59,7 @@ impl ServiceDiscovery {
         let mut services = match protocol_type {
             Some(protocol) => {
                 if !self.config.is_protocol_enabled(protocol) {
-                    return Err(DiscoveryError::protocol(format!("Protocol {:?} is not enabled", protocol)));
+                    return Err(DiscoveryError::protocol(format!("Protocol {protocol:?} is not enabled")));
                 }
                 self.protocol_manager.discover_services_with_protocol(protocol, service_types, timeout).await?
             }
@@ -84,6 +84,80 @@ impl ServiceDiscovery {
         }
 
         info!("Discovered {} services", services.len());
+        info!("Discovered {} services", services.len());
+        Ok(services)
+    }
+
+    /// Discover services with filtering by service types
+    /// 
+    /// This provides more granular control over service discovery than the basic
+    /// `discover_services` method.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `service_types` - Optional list of specific service types to discover. 
+    ///   If None, uses all configured service types.
+    /// * `protocol_type` - Optional protocol filter. If None, uses all enabled protocols.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use auto_discovery::{ServiceDiscovery, types::{ServiceType, ProtocolType}};
+    /// 
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let discovery = ServiceDiscovery::new(auto_discovery::config::DiscoveryConfig::new()).await?;
+    /// // Discover only HTTP services using mDNS
+    /// let http_services = discovery.discover_services_filtered(
+    ///     Some(vec![ServiceType::new("_http._tcp")?]),
+    ///     Some(ProtocolType::Mdns)
+    /// ).await?;
+    /// 
+    /// // Discover all configured services using any protocol
+    /// let all_services = discovery.discover_services_filtered(None, None).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn discover_services_filtered(&self, 
+        service_types: Option<Vec<crate::types::ServiceType>>, 
+        protocol_type: Option<ProtocolType>
+    ) -> Result<Vec<ServiceInfo>> {
+        debug!("Starting filtered service discovery");
+        
+        let target_service_types = match service_types {
+            Some(types) => types,
+            None => self.config.service_types().to_vec()
+        };
+
+        if target_service_types.is_empty() {
+            return Err(DiscoveryError::configuration("No service types specified for discovery"));
+        }
+
+        let timeout = Some(self.config.protocol_timeout());
+        let mut services = match protocol_type {
+            Some(protocol) => {
+                if !self.config.is_protocol_enabled(protocol) {
+                    return Err(DiscoveryError::protocol(format!("Protocol {protocol:?} is not enabled")));
+                }
+                self.protocol_manager.discover_services_with_protocol(protocol, target_service_types, timeout).await?
+            }
+            None => self.protocol_manager.discover_services(target_service_types, timeout).await?,
+        };
+
+        // Apply service filtering
+        if let Some(filter) = self.config.filter() {
+            services.retain(|service| filter.matches(service));
+        }
+
+        // Update discovered services cache
+        {
+            let mut discovered = self.discovered_services.lock().await;
+            for service in &services {
+                discovered.insert(service.id.to_string(), service.clone());
+            }
+        }
+
+        info!("Discovered {} filtered services", services.len());
         Ok(services)
     }
 

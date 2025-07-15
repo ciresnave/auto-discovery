@@ -1,7 +1,6 @@
 //! DNS-SD (DNS Service Discovery) protocol implementation
 
 use std::{sync::Arc, time::Duration};
-use tokio::sync::Mutex;
 use async_trait::async_trait;
 use governor::{
     state::keyed::DefaultKeyedStateStore,
@@ -13,6 +12,7 @@ use crate::{
     config::DiscoveryConfig,
     error::{DiscoveryError, Result},
     protocols::DiscoveryProtocol,
+    registry::ServiceRegistry,
     service::ServiceInfo,
     types::{ProtocolType, ServiceType},
 };
@@ -26,13 +26,17 @@ pub struct DnsSdProtocol {
     #[allow(dead_code)]
     rate_limiter: Arc<RateLimiter<String, DefaultKeyedStateStore<String>, DefaultClock>>,
     #[allow(dead_code)]
-    registered_services: Arc<Mutex<std::collections::HashMap<String, ServiceInfo>>>,
+    registry: Option<Arc<ServiceRegistry>>,
 }
 
 #[async_trait]
 impl DiscoveryProtocol for DnsSdProtocol {
     fn protocol_type(&self) -> ProtocolType {
         ProtocolType::DnsSd
+    }
+
+    fn set_registry(&mut self, registry: Arc<ServiceRegistry>) {
+        self.registry = Some(registry);
     }
 
     async fn discover_services(

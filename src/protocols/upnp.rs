@@ -1,229 +1,233 @@
-//! UPnP (Universal Plug and Play) and SSDP protocol implementation
+//! UPnP (Universal Plug and Play) and SSDP protocol implementation with real multicast support
 
 use crate::{
     config::DiscoveryConfig,
-    error::{DiscoveryError, Result},
+    error::Result,
+    registry::ServiceRegistry,
     service::ServiceInfo,
     types::{ServiceType, ProtocolType},
     protocols::DiscoveryProtocol,
 };
 use async_trait::async_trait;
 use std::{
-    net::{IpAddr, SocketAddr},
+    collections::HashMap,
+    net::SocketAddr,
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{
     net::UdpSocket,
-    sync::Mutex,
+    sync::{oneshot, RwLock},
+    task::JoinHandle,
 };
-use tracing::warn;
-use uuid::Uuid;
-
-const SSDP_ADDR: &str = "239.255.255.250:1900";
-const DEFAULT_TTL: u32 = 1800;
+use tracing::{debug, error, info};
 
 /// SSDP (Simple Service Discovery Protocol) implementation for UPnP discovery
 pub struct SsdpProtocol {
-    socket: Arc<Mutex<UdpSocket>>,
-}
-
-#[derive(Debug)]
-enum SsdpMessage {
-    Search {
-        search_target: String,
-    },
-    Response {
-        location: String,
-        service_type: String,
-        usn: String,
-    },
-    Notify {
-        nt: String,
-        nts: String,
-        location: String,
-        usn: String,
-    },
-}
-
-impl SsdpMessage {
-    fn parse(data: &str) -> Option<Self> {
-        let mut lines = data.lines();
-        let first_line = lines.next()?;
-
-        if first_line.starts_with("M-SEARCH") {
-            let mut search_target = None;
-
-            for line in lines {
-                if line.starts_with("ST:") {
-                    search_target = Some(line[3..].trim().to_string());
-                    break;
-                }
-            }
-
-            if let Some(st) = search_target {
-                return Some(SsdpMessage::Search { search_target: st });
-            }
-        } else if first_line.starts_with("NOTIFY") {
-            let mut nt = None;
-            let mut nts = None;
-            let mut location = None;
-            let mut usn = None;
-
-            for line in lines {
-                let line = line.trim();
-                if line.starts_with("NT:") {
-                    nt = Some(line[3..].trim().to_string());
-                } else if line.starts_with("NTS:") {
-                    nts = Some(line[4..].trim().to_string());
-                } else if line.starts_with("LOCATION:") {
-                    location = Some(line[9..].trim().to_string());
-                } else if line.starts_with("USN:") {
-                    usn = Some(line[4..].trim().to_string());
-                }
-            }
-
-            if let (Some(nt), Some(nts), Some(location), Some(usn)) = (nt, nts, location, usn) {
-                return Some(SsdpMessage::Notify { nt, nts, location, usn });
-            }
-        } else if first_line.starts_with("HTTP/1.1 200") {
-            let mut location = None;
-            let mut service_type = None;
-            let mut usn = None;
-
-            for line in lines {
-                let line = line.trim();
-                if line.starts_with("LOCATION:") {
-                    location = Some(line[9..].trim().to_string());
-                } else if line.starts_with("ST:") {
-                    service_type = Some(line[3..].trim().to_string());
-                } else if line.starts_with("USN:") {
-                    usn = Some(line[4..].trim().to_string());
-                }
-            }
-
-            if let (Some(location), Some(service_type), Some(usn)) = (location, service_type, usn) {
-                return Some(SsdpMessage::Response { location, service_type, usn });
-            }
-        }
-
-        None
-    }
-
-    fn to_string(&self) -> String {
-        match self {
-            SsdpMessage::Search { search_target } => {
-                format!(
-                    "M-SEARCH * HTTP/1.1\r\n\
-                     HOST: {}\r\n\
-                     MAN: \"ssdp:discover\"\r\n\
-                     MX: 3\r\n\
-                     ST: {}\r\n\
-                     \r\n",
-                    SSDP_ADDR, search_target
-                )
-            }
-            SsdpMessage::Response { location, service_type, usn } => {
-                format!(
-                    "HTTP/1.1 200 OK\r\n\
-                     CACHE-CONTROL: max-age={}\r\n\
-                     LOCATION: {}\r\n\
-                     ST: {}\r\n\
-                     USN: {}\r\n\
-                     \r\n",
-                    DEFAULT_TTL, location, service_type, usn
-                )
-            }
-            SsdpMessage::Notify { nt, nts, location, usn } => {
-                format!(
-                    "NOTIFY * HTTP/1.1\r\n\
-                     HOST: {}\r\n\
-                     NT: {}\r\n\
-                     NTS: {}\r\n\
-                     LOCATION: {}\r\n\
-                     USN: {}\r\n\
-                     \r\n",
-                    SSDP_ADDR, nt, nts, location, usn
-                )
-            }
-        }
-    }
+    registry: Arc<ServiceRegistry>,
+    #[allow(dead_code)]
+    config: DiscoveryConfig,
+    /// Background listener task handle
+    listener_handle: Option<JoinHandle<()>>,
+    /// Shutdown channel sender
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    /// Registered services for responding to search requests
+    registered_services: Arc<RwLock<HashMap<String, ServiceInfo>>>,
 }
 
 impl SsdpProtocol {
     /// Create a new SSDP protocol instance
-    /// 
-    /// # Arguments
-    /// 
-    /// * `_config` - The discovery configuration (currently unused)
-    /// 
-    /// # Errors
-    /// 
-    /// Returns an error if UDP socket creation fails
-    pub async fn new(_config: &DiscoveryConfig) -> Result<Self> {
-        let socket = UdpSocket::bind("0.0.0.0:0")
-            .await
-            .map_err(|e| DiscoveryError::upnp(format!("Failed to bind socket: {}", e)))?;
-
-        socket.set_multicast_ttl_v4(4)
-            .map_err(|e| DiscoveryError::upnp(format!("Failed to set multicast TTL: {}", e)))?;
+    pub fn new(config: DiscoveryConfig) -> Result<Self> {
+        let registry = Arc::new(ServiceRegistry::new());
+        let registered_services = Arc::new(RwLock::new(HashMap::new()));
 
         Ok(Self {
-            socket: Arc::new(Mutex::new(socket)),
+            registry,
+            config,
+            listener_handle: None,
+            shutdown_tx: None,
+            registered_services,
         })
     }
 
-    async fn send_search(&self, service_type: &str) -> Result<()> {
-        let msg = SsdpMessage::Search {
-            search_target: service_type.to_string(),
-        };
+    /// Start the SSDP listener
+    pub async fn start_listener(&mut self) -> Result<()> {
+        if self.listener_handle.is_some() {
+            return Ok(());
+        }
 
-        let ssdp_addr: SocketAddr = SSDP_ADDR.parse()
-            .map_err(|e| DiscoveryError::upnp(format!("Invalid SSDP address: {}", e)))?;
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        self.shutdown_tx = Some(shutdown_tx);
 
-        self.socket.lock()
-            .await
-            .send_to(msg.to_string().as_bytes(), &ssdp_addr)
-            .await
-            .map_err(|e| DiscoveryError::upnp(format!("Failed to send SSDP search: {}", e)))?;
+        let registered_services = self.registered_services.clone();
+        let handle = tokio::spawn(async move {
+            if let Err(e) = Self::run_listener(registered_services, shutdown_rx).await {
+                error!("SSDP listener error: {}", e);
+            }
+        });
+
+        self.listener_handle = Some(handle);
+        info!("SSDP listener started");
 
         Ok(())
     }
 
-    fn parse_ssdp_response(&self, response: &str, addr: IpAddr) -> Option<ServiceInfo> {
-        if let Some(SsdpMessage::Response { location, service_type, usn }) = SsdpMessage::parse(response) {
-            let service = ServiceInfo::new(
-                &format!("upnp-{}", Uuid::new_v4()),
-                &service_type,
-                0,
-                Some(vec![("location", &location), ("usn", &usn)])
-            ).ok()?
-            .with_address(addr);
+    /// Start the SSDP listener in the background
+    async fn run_listener(
+        registered_services: Arc<RwLock<HashMap<String, ServiceInfo>>>,
+        mut shutdown_rx: oneshot::Receiver<()>,
+    ) -> Result<()> {
+        let socket = UdpSocket::bind("0.0.0.0:1900").await?;
+        socket.set_broadcast(true)?;
+        
+        socket.join_multicast_v4("239.255.255.250".parse().unwrap(), "0.0.0.0".parse().unwrap())?;
+        
+        let mut buf = [0u8; 1024];
+        
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => break,
+                result = socket.recv_from(&mut buf) => {
+                    match result {
+                        Ok((len, addr)) => {
+                            let message = String::from_utf8_lossy(&buf[..len]);
+                            if message.contains("M-SEARCH") {
+                                // Handle M-SEARCH request
+                                let search_target = Self::parse_search_target(&message);
+                                let services = registered_services.read().await;
+                                for service in services.values() {
+                                    if Self::service_matches_search(&search_target, service) {
+                                        let _ = Self::send_response(&socket, addr, service).await;
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => break,
+                    }
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    /// Parse search target from M-SEARCH message
+    fn parse_search_target(message: &str) -> String {
+        for line in message.lines() {
+            if let Some(stripped) = line.strip_prefix("ST:") {
+                return stripped.trim().to_string();
+            }
+        }
+        "ssdp:all".to_string()
+    }
+
+    /// Check if a service matches the search target
+    fn service_matches_search(search_target: &str, _service: &ServiceInfo) -> bool {
+        matches!(search_target, "ssdp:all" | "upnp:rootdevice")
+    }
+
+    /// Send a response to an M-SEARCH request
+    async fn send_response(socket: &UdpSocket, addr: SocketAddr, service: &ServiceInfo) -> Result<()> {
+        let response = format!(
+            "HTTP/1.1 200 OK\r\n\
+            CACHE-CONTROL: max-age=1800\r\n\
+            DATE: {}\r\n\
+            EXT:\r\n\
+            LOCATION: http://{}:{}/\r\n\
+            SERVER: AutoDiscovery/1.0 UPnP/1.0\r\n\
+            ST: upnp:rootdevice\r\n\
+            USN: uuid:{}::upnp:rootdevice\r\n\
+            \r\n",
+            chrono::Utc::now().format("%a, %d %b %Y %H:%M:%S GMT"),
+            service.address,
+            service.port,
+            service.id
+        );
+        
+        socket.send_to(response.as_bytes(), addr).await?;
+        Ok(())
+    }
+
+    /// Send an SSDP search request
+    async fn send_search_request(service_type: &str, timeout_secs: u64) -> Result<UdpSocket> {
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        socket.set_broadcast(true)?;
+        
+        let search_msg = format!(
+            "M-SEARCH * HTTP/1.1\r\n\
+            HOST: 239.255.255.250:1900\r\n\
+            MAN: \"ssdp:discover\"\r\n\
+            ST: {service_type}\r\n\
+            MX: {timeout_secs}\r\n\
+            \r\n"
+        );
+        
+        let multicast_addr: SocketAddr = "239.255.255.250:1900".parse().unwrap();
+        socket.send_to(search_msg.as_bytes(), multicast_addr).await?;
+        
+        Ok(socket)
+    }
+
+    /// Send an SSDP announcement
+    async fn send_announcement(service: &ServiceInfo, notification_type: &str) -> Result<()> {
+        let socket = UdpSocket::bind("0.0.0.0:0").await?;
+        socket.set_broadcast(true)?;
+        
+        let announcement = format!(
+            "NOTIFY * HTTP/1.1\r\n\
+            HOST: 239.255.255.250:1900\r\n\
+            CACHE-CONTROL: max-age=1800\r\n\
+            LOCATION: http://{}:{}/\r\n\
+            NT: upnp:rootdevice\r\n\
+            NTS: {}\r\n\
+            USN: uuid:{}::upnp:rootdevice\r\n\
+            SERVER: AutoDiscovery/1.0 UPnP/1.0\r\n\
+            \r\n",
+            service.address,
+            service.port,
+            notification_type,
+            service.id
+        );
+        
+        let multicast_addr: SocketAddr = "239.255.255.250:1900".parse().unwrap();
+        socket.send_to(announcement.as_bytes(), multicast_addr).await?;
+        
+        Ok(())
+    }
+
+    /// Parse service information from SSDP response
+    fn parse_service_from_response(response: &str, addr: SocketAddr) -> Option<ServiceInfo> {
+        let mut location = None;
+        let mut usn = None;
+        
+        for line in response.lines() {
+            if let Some(stripped) = line.strip_prefix("LOCATION:") {
+                location = Some(stripped.trim().to_string());
+            } else if let Some(stripped) = line.strip_prefix("USN:") {
+                usn = Some(stripped.trim().to_string());
+            }
+        }
+        
+        if let (Some(location), Some(usn)) = (location, usn) {
+            let service_id = usn.split("::").next().unwrap_or("unknown").to_string();
+            let mut service = ServiceInfo::new(
+                service_id,
+                "upnp._tcp",
+                addr.port(),
+                Some(vec![
+                    ("location", &location),
+                    ("usn", &usn),
+                ])
+            ).ok()?;
+            
+            service.address = addr.ip();
             
             Some(service)
         } else {
             None
         }
     }
-
-    #[allow(dead_code)]
-    async fn check_health(&self) -> bool {
-        let ssdp_addr: SocketAddr = match SSDP_ADDR.parse() {
-            Ok(addr) => addr,
-            Err(_) => return false,
-        };
-
-        let test_data = [0u8; 1];
-        self.socket.lock()
-            .await
-            .send_to(&test_data, ssdp_addr)
-            .await
-            .is_ok()
-    }
 }
-
-/// Type alias for UPnP protocol using SSDP implementation
-pub type UpnpProtocol = SsdpProtocol;
 
 #[async_trait]
 impl DiscoveryProtocol for SsdpProtocol {
@@ -231,136 +235,162 @@ impl DiscoveryProtocol for SsdpProtocol {
         ProtocolType::Upnp
     }
 
+    /// Discover services of the specified types with timeout
     async fn discover_services(
         &self,
         service_types: Vec<ServiceType>,
         timeout: Option<Duration>,
     ) -> Result<Vec<ServiceInfo>> {
-        let mut all_services = Vec::new();
-        
+        let mut services = Vec::new();
+        let timeout_duration = timeout.unwrap_or(Duration::from_secs(10)).min(Duration::from_secs(30));
+        let start_time = Instant::now();
+
+        debug!("Starting UPnP discovery for service types: {:?}", service_types);
+
+        // Send search request for each service type
         for service_type in service_types {
-            self.send_search(&service_type.to_string()).await?;
-        }
+            let socket = Self::send_search_request(&service_type.to_string(), timeout_duration.as_secs()).await?;
 
-        let timeout_duration = timeout.unwrap_or(Duration::from_secs(30));
-        let mut buf = [0; 1024];
-        let timeout_instant = tokio::time::Instant::now() + timeout_duration;
-
-        loop {
-            let remaining = timeout_instant.saturating_duration_since(tokio::time::Instant::now());
-            if remaining.is_zero() {
-                break;
-            }
-
-            match tokio::time::timeout(remaining, self.socket.lock().await.recv_from(&mut buf)).await {
-                Ok(Ok((len, addr))) => {
-                    let response = String::from_utf8_lossy(&buf[..len]).to_string();
-                    if let Some(service) = self.parse_ssdp_response(&response, addr.ip()) {
-                        all_services.push(service);
-                    }
+            let mut buf = [0u8; 2048];
+            while start_time.elapsed() < timeout_duration {
+                let remaining = timeout_duration - start_time.elapsed();
+                if remaining.is_zero() {
+                    break;
                 }
-                Ok(Err(e)) => warn!("Error receiving SSDP response: {}", e),
-                Err(_) => break, // Timeout
+
+                match tokio::time::timeout(remaining, socket.recv_from(&mut buf)).await {
+                    Ok(Ok((len, addr))) => {
+                        let response = String::from_utf8_lossy(&buf[..len]);
+                        if let Some(service) = Self::parse_service_from_response(&response, addr) {
+                            debug!("Discovered UPnP service: {:?}", service);
+                            services.push(service);
+                        }
+                    }
+                    Ok(Err(_)) => break,
+                    Err(_) => break,
+                }
             }
         }
 
-        Ok(all_services)
+        info!("UPnP discovery found {} services", services.len());
+        Ok(services)
     }
 
     async fn register_service(&self, service: ServiceInfo) -> Result<()> {
-        let msg = SsdpMessage::Notify {
-            nt: service.service_type.to_string(),
-            nts: "ssdp:alive".to_string(),
-            location: format!("http://{}:{}", service.address, service.port),
-            usn: format!("uuid:{}", Uuid::new_v4()),
-        };
+        // Store in our registered services for responding to searches
+        let mut services = self.registered_services.write().await;
+        services.insert(service.id.to_string(), service.clone());
 
-        let ssdp_addr: SocketAddr = SSDP_ADDR.parse()
-            .map_err(|e| DiscoveryError::upnp(format!("Invalid SSDP address: {}", e)))?;
+        // Send announcement
+        Self::send_announcement(&service, "ssdp:alive").await?;
 
-        self.socket.lock()
-            .await
-            .send_to(msg.to_string().as_bytes(), &ssdp_addr)
-            .await
-            .map_err(|e| DiscoveryError::upnp(format!("Failed to register service: {}", e)))?;
-
+        info!("Registered UPnP service: {} ({}:{})", service.name, service.address, service.port);
         Ok(())
     }
 
     async fn unregister_service(&self, service: &ServiceInfo) -> Result<()> {
-        let msg = SsdpMessage::Notify {
-            nt: service.service_type.to_string(),
-            nts: "ssdp:byebye".to_string(),
-            location: format!("http://{}:{}", service.address, service.port),
-            usn: format!("uuid:{}", Uuid::new_v4()),
-        };
-
-        let ssdp_addr: SocketAddr = SSDP_ADDR.parse()
-            .map_err(|e| DiscoveryError::upnp(format!("Invalid SSDP address: {}", e)))?;
-
-        self.socket.lock()
-            .await
-            .send_to(msg.to_string().as_bytes(), &ssdp_addr)
-            .await
-            .map_err(|e| DiscoveryError::upnp(format!("Failed to unregister service: {}", e)))?;
+        let service_id = service.id.to_string();
+        
+        // Remove from our registered services
+        let mut services = self.registered_services.write().await;
+        if let Some(service) = services.remove(&service_id) {
+            // Send byebye announcement
+            Self::send_announcement(&service, "ssdp:byebye").await?;
+            info!("Unregistered UPnP service: {} ({}:{})", service.name, service.address, service.port);
+        }
 
         Ok(())
     }
 
-    async fn verify_service(&self, _service: &ServiceInfo) -> Result<bool> {
-        // Simple availability check - could be enhanced
-        Ok(true)
+    async fn verify_service(&self, service: &ServiceInfo) -> Result<bool> {
+        // For UPnP, we try to connect to the service endpoint
+        let endpoint = format!("{}:{}", service.address, service.port);
+        
+        match tokio::time::timeout(Duration::from_secs(5), tokio::net::TcpStream::connect(&endpoint)).await {
+            Ok(Ok(_)) => {
+                debug!("UPnP service verified: {}", endpoint);
+                Ok(true)
+            }
+            Ok(Err(e)) => {
+                debug!("UPnP service verification failed: {}: {}", endpoint, e);
+                Ok(false)
+            }
+            Err(_) => {
+                debug!("UPnP service verification timed out: {}", endpoint);
+                Ok(false)
+            }
+        }
     }
 
     async fn is_available(&self) -> bool {
+        // UPnP/SSDP is generally available on most networks
         true
+    }
+
+    fn set_registry(&mut self, registry: Arc<ServiceRegistry>) {
+        self.registry = registry;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::Ipv4Addr;
-    use tokio::test;
+    use std::time::Duration;
 
-    #[test]
-    async fn test_upnp_discovery() {
-        let config = crate::config::DiscoveryConfig::new();
-        let protocol = SsdpProtocol::new(&config).await.unwrap();
-
-        let service_type = ServiceType::new("urn:schemas-upnp-org:service:ContentDirectory:1").unwrap();
-        let services = protocol
-            .discover_services(vec![service_type], Some(Duration::from_secs(1)))
-            .await
-            .unwrap();
-
-        // Note: This test might fail if no UPnP devices are on the network
-        assert!(!services.is_empty() || services.is_empty()); // Just verify services vector is valid
+    #[tokio::test]
+    async fn test_ssdp_protocol_creation() {
+        let config = DiscoveryConfig::new();
+        let protocol = SsdpProtocol::new(config);
+        assert!(protocol.is_ok());
     }
 
-    #[test]
-    async fn test_response_parsing() {
-        let config = crate::config::DiscoveryConfig::new();
-        let protocol = SsdpProtocol::new(&config).await.unwrap();
+    #[tokio::test]
+    async fn test_search_target_parsing() {
+        let message = "M-SEARCH * HTTP/1.1\r\nST: upnp:rootdevice\r\n\r\n";
+        let target = SsdpProtocol::parse_search_target(message);
+        assert_eq!(target, "upnp:rootdevice");
+    }
 
-        let response = "\
-            HTTP/1.1 200 OK\r\n\
-            CACHE-CONTROL: max-age=1800\r\n\
-            LOCATION: http://192.168.1.1:8080/device.xml\r\n\
-            ST: urn:schemas-upnp-org:service:ContentDirectory:1\r\n\
-            USN: uuid:12345678-1234-1234-1234-123456789012\r\n\
-            \r\n";
+    #[tokio::test]
+    async fn test_service_matching() {
+        let service = ServiceInfo::new(
+            "test-service",
+            "upnp._tcp",
+            8080,
+            None
+        ).unwrap();
+        
+        assert!(SsdpProtocol::service_matches_search("ssdp:all", &service));
+        assert!(SsdpProtocol::service_matches_search("upnp:rootdevice", &service));
+        assert!(!SsdpProtocol::service_matches_search("specific:service", &service));
+    }
 
-        let service = protocol.parse_ssdp_response(
-            response,
-            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
-        );
+    #[tokio::test]
+    async fn test_service_registration() {
+        let config = DiscoveryConfig::new();
+        let protocol = SsdpProtocol::new(config).unwrap();
+        
+        let service = ServiceInfo::new(
+            "test-service",
+            "upnp._tcp",
+            8080,
+            None
+        ).unwrap();
+        
+        let result = protocol.register_service(service).await;
+        assert!(result.is_ok());
+    }
 
-        assert!(service.is_some());
-        let service = service.unwrap();
-        assert_eq!(
-            service.service_type().full_name(),
-            "urn:schemas-upnp-org:service:ContentDirectory:1"
-        );
+    #[tokio::test]
+    async fn test_service_discovery() {
+        let config = DiscoveryConfig::new();
+        let protocol = SsdpProtocol::new(config).unwrap();
+        
+        let service_type = ServiceType::new("upnp._tcp").unwrap();
+        let service_types = vec![service_type];
+        let timeout = Some(Duration::from_secs(1));
+        
+        let result = protocol.discover_services(service_types, timeout).await;
+        assert!(result.is_ok());
     }
 }

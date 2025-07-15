@@ -137,8 +137,7 @@ pub mod network {
         }
 
         Err(DiscoveryError::other(format!(
-            "Interface '{}' not found",
-            interface_name
+            "Interface '{interface_name}' not found"
         )))
     }
 
@@ -146,10 +145,7 @@ pub mod network {
     pub async fn is_port_available(port: u16) -> bool {
         use tokio::net::TcpListener;
         
-        match TcpListener::bind(("127.0.0.1", port)).await {
-            Ok(_) => true,
-            Err(_) => false,
-        }
+        (TcpListener::bind(("127.0.0.1", port)).await).is_ok()
     }
 
     /// Find an available port in a given range
@@ -192,11 +188,11 @@ pub mod time {
         let millis = duration.subsec_millis();
 
         if hours > 0 {
-            format!("{}h {}m {}s", hours, minutes, seconds)
+            format!("{hours}h {minutes}m {seconds}s")
         } else if minutes > 0 {
-            format!("{}m {}s", minutes, seconds)
+            format!("{minutes}m {seconds}s")
         } else if seconds > 0 {
-            format!("{}.{:03}s", seconds, millis)
+            format!("{seconds}.{millis:03}s")
         } else {
             format!("{}ms", duration.as_millis())
         }
@@ -273,7 +269,7 @@ pub mod string {
                 if v.is_empty() {
                     k.clone()
                 } else {
-                    format!("{}={}", k, v)
+                    format!("{k}={v}")
                 }
             })
             .collect::<Vec<_>>()

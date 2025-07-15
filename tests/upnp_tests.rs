@@ -11,7 +11,7 @@ use tokio::time;
 #[tokio::test]
 async fn test_ssdp_protocol_lifecycle() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let ssdp = SsdpProtocol::new(config)?;
     
     assert_eq!(ssdp.protocol_type(), ProtocolType::Upnp);
     assert!(ssdp.is_available().await);
@@ -22,7 +22,7 @@ async fn test_ssdp_protocol_lifecycle() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_service_registration() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let ssdp = SsdpProtocol::new(config)?;
     
     let service = ServiceInfo::new(
         "test-ssdp-service",
@@ -56,7 +56,7 @@ async fn test_ssdp_service_registration() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_service_verification() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let ssdp = SsdpProtocol::new(config)?;
     
     let service = ServiceInfo::new(
         "test-verify-service",
@@ -81,7 +81,7 @@ async fn test_ssdp_service_verification() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_timeout_handling() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let ssdp = SsdpProtocol::new(config)?;
     
     // Use very short timeout for non-existent service
     let services = ssdp.discover_services(
@@ -97,7 +97,7 @@ async fn test_ssdp_timeout_handling() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_multiple_services() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let ssdp = SsdpProtocol::new(config)?;
     
     let mut services = Vec::new();
     for i in 1..=3 {
@@ -140,7 +140,7 @@ async fn test_ssdp_multiple_services() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_rate_limiting() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let ssdp = SsdpProtocol::new(config)?;
     
     let service = ServiceInfo::new(
         "rate-limit-test",
@@ -168,7 +168,7 @@ async fn test_ssdp_rate_limiting() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_invalid_service() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = SsdpProtocol::new(&config).await?;
+    let _ssdp = SsdpProtocol::new(config)?;
     
     // Try to create an invalid service (empty service type should cause an error)
     let invalid_service_result = ServiceInfo::new(
@@ -186,7 +186,7 @@ async fn test_ssdp_invalid_service() -> Result<()> {
 #[tokio::test]
 async fn test_ssdp_concurrent_operations() -> Result<()> {
     let config = DiscoveryConfig::default();
-    let ssdp = std::sync::Arc::new(SsdpProtocol::new(&config).await?);
+    let ssdp = std::sync::Arc::new(SsdpProtocol::new(config)?);
     
     let mut handles = Vec::new();
     

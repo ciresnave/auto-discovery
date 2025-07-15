@@ -17,6 +17,15 @@ pub enum DiscoveryError {
     Configuration(String),
     /// Invalid service data error
     InvalidData(String),
+    /// Invalid service info error
+    InvalidServiceInfo { 
+        /// The field that contains invalid data
+        field: String, 
+        /// The reason why the field is invalid
+        reason: String 
+    },
+    /// Service not found error
+    ServiceNotFound(String),
     /// DNS resolution error
     DnsResolution(String),
     /// mDNS protocol error
@@ -44,19 +53,23 @@ pub enum DiscoveryError {
 impl fmt::Display for DiscoveryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Configuration(msg) => write!(f, "Configuration error: {}", msg),
-            Self::InvalidData(msg) => write!(f, "Invalid data: {}", msg),
-            Self::DnsResolution(msg) => write!(f, "DNS resolution error: {}", msg),
-            Self::Mdns(msg) => write!(f, "mDNS error: {}", msg),
-            Self::Upnp(msg) => write!(f, "UPnP error: {}", msg),
-            Self::DnsSd(msg) => write!(f, "DNS-SD error: {}", msg),
-            Self::Network(msg) => write!(f, "Network error: {}", msg),
-            Self::Timeout(msg) => write!(f, "Timeout: {}", msg),
-            Self::Verification(msg) => write!(f, "Verification error: {}", msg),
-            Self::Protocol(msg) => write!(f, "Protocol error: {}", msg),
-            Self::Io(err) => write!(f, "I/O error: {}", err),
-            Self::Security(msg) => write!(f, "Security error: {}", msg),
-            Self::Other(msg) => write!(f, "Error: {}", msg),
+            Self::Configuration(msg) => write!(f, "Configuration error: {msg}"),
+            Self::InvalidData(msg) => write!(f, "Invalid data: {msg}"),
+            Self::InvalidServiceInfo { field, reason } => {
+                write!(f, "Invalid service info ({field}): {reason}")
+            }
+            Self::ServiceNotFound(msg) => write!(f, "Service not found: {msg}"),
+            Self::DnsResolution(msg) => write!(f, "DNS resolution error: {msg}"),
+            Self::Mdns(msg) => write!(f, "mDNS error: {msg}"),
+            Self::Upnp(msg) => write!(f, "UPnP error: {msg}"),
+            Self::DnsSd(msg) => write!(f, "DNS-SD error: {msg}"),
+            Self::Network(msg) => write!(f, "Network error: {msg}"),
+            Self::Timeout(msg) => write!(f, "Timeout: {msg}"),
+            Self::Verification(msg) => write!(f, "Verification error: {msg}"),
+            Self::Protocol(msg) => write!(f, "Protocol error: {msg}"),
+            Self::Io(err) => write!(f, "I/O error: {err}"),
+            Self::Security(msg) => write!(f, "Security error: {msg}"),
+            Self::Other(msg) => write!(f, "Error: {msg}"),
         }
     }
 }
@@ -137,6 +150,11 @@ impl DiscoveryError {
     /// Create a new invalid data error
     pub fn invalid_data<S: Into<String>>(msg: S) -> Self {
         Self::InvalidData(msg.into())
+    }
+
+    /// Create a new service not found error
+    pub fn service_not_found<S: Into<String>>(msg: S) -> Self {
+        Self::ServiceNotFound(msg.into())
     }
 
     /// Create a new DNS resolution error

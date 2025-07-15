@@ -45,11 +45,29 @@ impl ServiceInfo {
         port: u16,
         attributes: Option<Vec<(&str, &str)>>
     ) -> Result<Self, crate::error::DiscoveryError> {
+        let name = name.into();
+        
+        // Validate name is not empty
+        if name.trim().is_empty() {
+            return Err(crate::error::DiscoveryError::InvalidServiceInfo {
+                field: "name".to_string(),
+                reason: "Service name cannot be empty".to_string(),
+            });
+        }
+        
+        // Validate port is not 0
+        if port == 0 {
+            return Err(crate::error::DiscoveryError::InvalidServiceInfo {
+                field: "port".to_string(),
+                reason: "Port cannot be zero".to_string(),
+            });
+        }
+        
         let service_type = ServiceType::new(service_type)?;
         
         let mut info = Self {
             id: Uuid::new_v4(),
-            name: name.into(),
+            name: name.to_string(),
             service_type,
             address: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port,
@@ -281,10 +299,10 @@ impl ServiceEvent {
 impl fmt::Display for ServiceEvent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::New(service) => write!(f, "New service: {}", service),
-            Self::Updated(service) => write!(f, "Updated service: {}", service),
-            Self::Removed(service) => write!(f, "Removed service: {}", service),
-            Self::VerificationFailed(service) => write!(f, "Verification failed: {}", service),
+            Self::New(service) => write!(f, "New service: {service}"),
+            Self::Updated(service) => write!(f, "Updated service: {service}"),
+            Self::Removed(service) => write!(f, "Removed service: {service}"),
+            Self::VerificationFailed(service) => write!(f, "Verification failed: {service}"),
             Self::DiscoveryStarted {
                 service_types,
                 protocols,
@@ -299,8 +317,7 @@ impl fmt::Display for ServiceEvent {
                 duration,
             } => write!(
                 f,
-                "Discovery completed: {} services found in {:?}",
-                services_found, duration
+                "Discovery completed: {services_found} services found in {duration:?}"
             ),
             Self::DiscoveryFailed { error, service_types } => write!(
                 f,
@@ -341,9 +358,9 @@ mod tests {
             8080,
             None,
         )?
-        .with_ttl(Duration::from_nanos(1));
+        .with_ttl(Duration::from_millis(1));
 
-        std::thread::sleep(Duration::from_millis(1));
+        std::thread::sleep(Duration::from_millis(10));
         assert!(service.is_expired());
 
         service.refresh();

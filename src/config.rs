@@ -252,7 +252,7 @@ impl DiscoveryConfig {
 
     /// Validate configuration
     pub fn validate(&self) -> Result<()> {
-        if self.timeout.map_or(false, |t| t.as_secs() == 0) {
+        if self.timeout.is_some_and(|t| t.as_secs() == 0) {
             return Err(crate::error::DiscoveryError::configuration(
                 "Timeout must be greater than 0",
             ));

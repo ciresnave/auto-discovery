@@ -58,7 +58,7 @@ impl ServiceType {
                 "Service type must contain protocol (e.g., '._tcp')",
             ));
         }
-        let protocol = format!(".{}", protocol_part);
+        let protocol = format!(".{protocol_part}");
         
         // Extract domain if present (third part and beyond)
         let domain = if parts.len() > 2 {
@@ -71,7 +71,7 @@ impl ServiceType {
         let final_service_name = if service_name.starts_with('_') {
             service_name
         } else {
-            format!("_{}", service_name)
+            format!("_{service_name}")
         };
 
         Ok(ServiceType {
@@ -82,10 +82,10 @@ impl ServiceType {
     }
 
     /// Create a new service type with specified protocol
-    pub fn with_protocol<S: Into<String>>(service: S, protocol: S) -> Result<Self> {
+    pub fn with_protocol<S1: Into<String>, S2: Into<String>>(service: S1, protocol: S2) -> Result<Self> {
         let mut protocol_str = protocol.into();
-        if !protocol_str.starts_with("_") {
-            protocol_str = format!("_{}", protocol_str);
+        if &protocol_str[0..1] != "_" {
+            protocol_str = format!("_{protocol_str}");
         }
 
         Ok(ServiceType {
@@ -132,17 +132,6 @@ impl ServiceType {
         }
     }
 
-    /// Convert to a string
-    pub fn to_string(&self) -> String {
-        let mut result = self.service_name.clone();
-        result.push_str(&self.protocol);
-        if let Some(domain) = &self.domain {
-            result.push('.');
-            result.push_str(domain);
-        }
-        result
-    }
-
     /// Check if the service type is valid
     pub fn is_valid(&self) -> bool {
         !self.service_name.is_empty() && !self.protocol.is_empty()
@@ -178,20 +167,15 @@ impl From<ServiceType> for String {
 }
 
 /// Protocol type for service discovery
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ProtocolType {
     /// Multicast DNS
+    #[default]
     Mdns,
     /// DNS Service Discovery
     DnsSd,
     /// Universal Plug and Play
     Upnp,
-}
-
-impl Default for ProtocolType {
-    fn default() -> Self {
-        ProtocolType::Mdns
-    }
 }
 
 impl fmt::Display for ProtocolType {

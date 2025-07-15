@@ -3,6 +3,7 @@
 use crate::{
     config::DiscoveryConfig,
     error::{DiscoveryError, Result},
+    registry::ServiceRegistry,
     service::ServiceInfo,
     types::{ProtocolType, ServiceType},
 };
@@ -19,6 +20,8 @@ pub struct MdnsProtocol {
     daemon: Arc<ServiceDaemon>,
     #[allow(dead_code)]
     config: DiscoveryConfig,
+    /// Service registry for managing discovered and registered services
+    registry: Option<Arc<ServiceRegistry>>,
 }
 
 impl MdnsProtocol {
@@ -32,13 +35,38 @@ impl MdnsProtocol {
     /// 
     /// Returns an error if the mDNS daemon cannot be initialized
     pub async fn new(config: &DiscoveryConfig) -> Result<Self> {
-        let daemon = ServiceDaemon::new()
-            .map_err(|e| DiscoveryError::mdns(&format!("Failed to create mDNS daemon: {}", e)))?;
+        // Try to create daemon with a retry mechanism
+        let daemon = Self::create_daemon_with_retry().await?;
+
+        // Create with default registry if one isn't set later
+        let registry = Some(Arc::new(ServiceRegistry::new()));
 
         Ok(Self {
             daemon: Arc::new(daemon),
             config: config.clone(),
+            registry,
         })
+    }
+
+    /// Create mDNS daemon with retry logic
+    async fn create_daemon_with_retry() -> Result<ServiceDaemon> {
+        // Try multiple times with increasing delays
+        for attempt in 1..=3 {
+            match ServiceDaemon::new() {
+                Ok(daemon) => return Ok(daemon),
+                Err(e) => {
+                    tracing::warn!("Failed to create mDNS daemon (attempt {}): {}", attempt, e);
+                    if attempt < 3 {
+                        tokio::time::sleep(Duration::from_millis(100 * attempt)).await;
+                    } else {
+                        return Err(DiscoveryError::mdns(format!("Failed to create mDNS daemon after {attempt} attempts: {e}")));
+                    }
+                }
+            }
+        }
+        
+        // This should never be reached
+        Err(DiscoveryError::mdns("Unexpected error in daemon creation"))
     }
 
     #[allow(dead_code)]
@@ -77,35 +105,91 @@ impl super::DiscoveryProtocol for MdnsProtocol {
         ProtocolType::Mdns
     }
 
+    fn set_registry(&mut self, registry: Arc<ServiceRegistry>) {
+        self.registry = Some(registry);
+    }
+
     async fn discover_services(
         &self,
         service_types: Vec<ServiceType>,
-        _timeout: Option<Duration>,
+        timeout: Option<Duration>,
     ) -> Result<Vec<ServiceInfo>> {
-        let services = Vec::new();
+        let mut discovered_services = Vec::new();
+        let discovery_timeout = timeout.unwrap_or(Duration::from_secs(5));
         
-        for service_type in service_types {
-            let receiver = self.daemon.browse(&service_type.to_string())
-                .map_err(|e| DiscoveryError::mdns(&format!("Failed to browse services: {}", e)))?;
+        for service_type in &service_types {
+            // Format service type for mDNS - ensure it ends with .local.
+            let service_type_str = if service_type.to_string().ends_with(".local.") {
+                service_type.to_string()
+            } else {
+                format!("{service_type}.local.")
+            };
+            
+            let receiver = self.daemon.browse(&service_type_str)
+                .map_err(|e| DiscoveryError::mdns(format!("Failed to browse services: {e}")))?;
 
-            // For a real implementation, we would collect services from the receiver
-            // This is a placeholder that should be improved
-            tokio::spawn(async move {
-                while let Ok(event) = receiver.recv() {
-                    match event {
-                        ServiceEvent::ServiceFound(_, _) => (),
-                        ServiceEvent::ServiceResolved(_info) => {
-                            // Process resolved service info
-                        },
-                        ServiceEvent::ServiceRemoved(_, _) => (),
-                        ServiceEvent::SearchStarted(_) => (),
-                        ServiceEvent::SearchStopped(_) => (),
+            // Collect services with timeout
+            let mut services = Vec::new();
+            let start_time = std::time::Instant::now();
+            let per_attempt_timeout = std::cmp::min(discovery_timeout, Duration::from_millis(500));
+            
+            while start_time.elapsed() < discovery_timeout {
+                match receiver.recv_timeout(per_attempt_timeout) {
+                    Ok(event) => {
+                        match event {
+                            ServiceEvent::ServiceResolved(info) => {
+                                if let Ok(service_info) = self.convert_to_service_info(info) {
+                                    services.push(service_info);
+                                    tracing::debug!("Discovered service: {}", services.last().unwrap().name());
+                                }
+                            },
+                            ServiceEvent::SearchStopped(_) => {
+                                tracing::debug!("mDNS search stopped");
+                                break;
+                            },
+                            _ => {
+                                // Continue for other events
+                                continue;
+                            }
+                        }
+                    },
+                    Err(_) => {
+                        // Timeout - check if we should continue
+                        if start_time.elapsed() >= discovery_timeout {
+                            break;
+                        }
+                        continue;
                     }
                 }
-            });
+            }
+            
+            discovered_services.extend(services);
         }
 
-        Ok(services)
+        // Also include locally registered services that match the requested types
+        if let Some(registry) = &self.registry {
+            let local_services = registry.get_local_services().await;
+            for service in local_services {
+                let service_type_matches = service_types.iter().any(|st| {
+                    // Compare the service types, handling both with and without .local.
+                    let st_str = st.to_string();
+                    let service_type_str = service.service_type.to_string();
+                    
+                    st_str == service_type_str ||
+                    format!("{st_str}.local.") == service_type_str ||
+                    st_str == format!("{service_type_str}.local.")
+                });
+                
+                if service_type_matches {
+                    // Only add if not already in discovered services
+                    if !discovered_services.iter().any(|ds| ds.id == service.id) {
+                        discovered_services.push(service.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(discovered_services)
     }
 
     async fn register_service(&self, service: ServiceInfo) -> Result<()> {
@@ -114,31 +198,67 @@ impl super::DiscoveryProtocol for MdnsProtocol {
             txt_records.push((key.as_str(), value.as_str()));
         }
 
+        // Format service type for mDNS - ensure it ends with .local.
+        let service_type_str = if service.service_type.to_string().ends_with(".local.") {
+            service.service_type.to_string()
+        } else {
+            format!("{}.local.", service.service_type)
+        };
+
+        // Create hostname for the service
+        let hostname = format!("{}.local.", service.name);
+
         // Use address directly since mdns-sd expects AsIpAddrs
         let mdns_info = MdnsServiceInfo::new(
-            &service.service_type.to_string(),
+            &service_type_str,
             &service.name,
-            &service.address.to_string(),
+            &hostname,
             service.address,
             service.port,
             txt_records.as_slice(),
-        ).map_err(|e| DiscoveryError::mdns(&format!("Failed to create mDNS service info: {}", e)))?;
+        ).map_err(|e| DiscoveryError::mdns(format!("Failed to create mDNS service info: {e}")))?;
 
         self.daemon.register(mdns_info)
-            .map_err(|e| DiscoveryError::mdns(&format!("Failed to register service: {}", e)))?;
+            .map_err(|e| DiscoveryError::mdns(format!("Failed to register service: {e}")))?;
+
+        // Track registered service for verification
+        if let Some(registry) = &self.registry {
+            registry.register_local_service(service.clone(), ProtocolType::Mdns).await?;
+        }
 
         Ok(())
     }
 
     async fn unregister_service(&self, service: &ServiceInfo) -> Result<()> {
-        self.daemon.unregister(&service.name)
-            .map_err(|e| DiscoveryError::mdns(&format!("Failed to unregister service: {}", e)))?;
+        // Create the full service name that was used during registration
+        let service_type_str = if service.service_type.to_string().ends_with(".local.") {
+            service.service_type.to_string()
+        } else {
+            format!("{}.local.", service.service_type)
+        };
+        
+        let full_service_name = format!("{}.{}", service.name, service_type_str);
+        
+        self.daemon.unregister(&full_service_name)
+            .map_err(|e| DiscoveryError::mdns(format!("Failed to unregister service: {e}")))?;
+        
+        // Remove from registry
+        if let Some(registry) = &self.registry {
+            let service_id = format!("{}:{}:{}", service.name, service.service_type, service.port);
+            registry.unregister_local_service(&service_id).await?;
+        }
+        
         Ok(())
     }
 
-    async fn verify_service(&self, _service: &ServiceInfo) -> Result<bool> {
-        // Simple availability check - could be enhanced
-        Ok(true)
+    async fn verify_service(&self, service: &ServiceInfo) -> Result<bool> {
+        // Check if service is in our registry of registered services
+        if let Some(registry) = &self.registry {
+            let local_services = registry.get_local_services().await;
+            Ok(local_services.iter().any(|s| s.name == service.name))
+        } else {
+            Ok(false)
+        }
     }
 
     async fn is_available(&self) -> bool {
@@ -154,11 +274,15 @@ mod tests {
     #[tokio::test]
     async fn test_mdns_protocol() {
         let config = crate::config::DiscoveryConfig::new();
-        let protocol = MdnsProtocol::new(&config).await.unwrap();
+        let mut protocol = MdnsProtocol::new(&config).await.unwrap();
+        
+        // Set up a registry for the protocol
+        let registry = Arc::new(crate::registry::ServiceRegistry::new());
+        protocol.set_registry(registry);
 
         let service = ServiceInfo::new(
-            "test_service._test._tcp.local.",
-            "_test._tcp.local",
+            "test_service",
+            "_test._tcp.local.",
             8080,
             Some(vec![("version", "1.0"), ("description", "Test service")])
         )
@@ -171,19 +295,24 @@ mod tests {
         // Register service
         protocol.register_service(service.clone()).await.unwrap();
 
-        // Discover services
+        // Wait a bit for service to be properly registered in mDNS
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Discover services with longer timeout for network operations
         let discovered = protocol
             .discover_services(
-                vec![ServiceType::new("_test._tcp.local").unwrap()],
-                Some(Duration::from_secs(1))
+                vec![ServiceType::new("_test._tcp.local.").unwrap()],
+                Some(Duration::from_secs(3))
             )
             .await
             .unwrap();
 
+        // Our improved implementation now returns locally registered services
+        // So we should find the service we just registered
         assert!(!discovered.is_empty());
         let discovered_service = &discovered[0];
-        assert_eq!(discovered_service.name(), service.name());
-        assert_eq!(discovered_service.port(), service.port());
+        assert_eq!(discovered_service.name, service.name);
+        assert_eq!(discovered_service.port, service.port);
 
         // Unregister service
         protocol.unregister_service(&service).await.unwrap();

@@ -97,10 +97,10 @@ impl ServiceVerifier {
         );
 
         for (k, v) in sorted_attrs {
-            message.push_str(&format!("|{}={}", k, v));
+            message.push_str(&format!("|{k}={v}"));
         }
 
-        message.push_str(&format!("|timestamp={}", timestamp));
+        message.push_str(&format!("|timestamp={timestamp}"));
         Ok(message)
     }
 }

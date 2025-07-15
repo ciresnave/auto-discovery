@@ -190,7 +190,9 @@ pub mod config;
 pub mod discovery;
 pub mod error;
 pub mod protocols;
+pub mod registry;  // Service registry for managing discovered and registered services
 pub mod service;
+pub mod simple;  // Simple API for common use cases
 pub mod types;
 pub mod utils;
 pub mod security;

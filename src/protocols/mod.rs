@@ -3,6 +3,7 @@
 use crate::{
     config::DiscoveryConfig,
     error::{DiscoveryError, Result},
+    registry::ServiceRegistry,
     service::ServiceInfo,
     types::{ProtocolType, ServiceType},
 };
@@ -13,6 +14,9 @@ use tracing::warn;
 pub mod mdns;
 pub mod upnp;
 pub mod dns_sd;
+
+#[cfg(feature = "simple-mdns")]
+pub mod simple_mdns;
 
 /// Trait for service discovery protocols
 #[async_trait]
@@ -38,6 +42,9 @@ pub trait DiscoveryProtocol: Send + Sync {
 
     /// Check if the protocol is available
     async fn is_available(&self) -> bool;
+
+    /// Set the service registry for this protocol
+    fn set_registry(&mut self, registry: Arc<ServiceRegistry>);
 }
 
 /// Manager for all discovery protocols
@@ -55,13 +62,22 @@ impl ProtocolManager {
 
         // Initialize protocols based on config
         if config.has_protocol(ProtocolType::Mdns) {
-            if let Ok(mdns) = mdns::MdnsProtocol::new(&config).await {
-                protocols.insert(ProtocolType::Mdns, Arc::new(mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>);
+            #[cfg(all(feature = "simple-mdns", not(feature = "mdns")))]
+            {
+                if let Ok(mdns) = simple_mdns::SimpleMdnsProtocol::new(&config).await {
+                    protocols.insert(ProtocolType::Mdns, Arc::new(mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>);
+                }
+            }
+            #[cfg(not(feature = "simple-mdns"))]
+            {
+                if let Ok(mdns) = mdns::MdnsProtocol::new(&config).await {
+                    protocols.insert(ProtocolType::Mdns, Arc::new(mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>);
+                }
             }
         }
 
         if config.has_protocol(ProtocolType::Upnp) {
-            if let Ok(ssdp) = upnp::SsdpProtocol::new(&config).await {
+            if let Ok(ssdp) = upnp::SsdpProtocol::new(config.clone()) {
                 protocols.insert(ProtocolType::Upnp, Arc::new(ssdp) as Arc<dyn DiscoveryProtocol + Send + Sync>);
             }
         }
@@ -69,6 +85,18 @@ impl ProtocolManager {
         if config.has_protocol(ProtocolType::DnsSd) {
             if let Ok(dns_sd) = dns_sd::DnsSdProtocol::new(&config).await {
                 protocols.insert(ProtocolType::DnsSd, Arc::new(dns_sd) as Arc<dyn DiscoveryProtocol + Send + Sync>);
+            }
+        }
+
+        #[cfg(feature = "simple-mdns")]
+        {
+            if config.has_protocol(ProtocolType::Mdns) {
+                if let Ok(simple_mdns) = simple_mdns::SimpleMdnsProtocol::new(&config).await {
+                    protocols.insert(
+                        ProtocolType::Mdns,
+                        Arc::new(simple_mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>,
+                    );
+                }
             }
         }
 
@@ -112,7 +140,7 @@ impl ProtocolManager {
         if let Some(protocol) = self.protocols.get(&protocol_type) {
             return protocol.discover_services(service_types, timeout).await;
         }
-        Err(DiscoveryError::protocol(format!("Protocol {:?} not available", protocol_type)))
+        Err(DiscoveryError::protocol(format!("Protocol {protocol_type:?} not available")))
     }
 
     /// Register a service with the appropriate protocol
@@ -123,8 +151,7 @@ impl ProtocolManager {
         }
         
         Err(DiscoveryError::protocol(format!(
-            "Protocol {:?} not available",
-            protocol_type
+            "Protocol {protocol_type:?} not available"
         )))
     }
 
@@ -134,10 +161,9 @@ impl ProtocolManager {
         if let Some(protocol) = self.protocols.get(&protocol_type) {
             return protocol.unregister_service(service).await;
         }
-        return Err(DiscoveryError::protocol(format!(
-            "Protocol {:?} not available",
-            protocol_type
-        )));
+        Err(DiscoveryError::protocol(format!(
+            "Protocol {protocol_type:?} not available"
+        )))
     }
 
     /// Verify a service is still available
@@ -146,10 +172,9 @@ impl ProtocolManager {
         if let Some(protocol) = self.protocols.get(&protocol_type) {
             return protocol.verify_service(service).await;
         }
-        return Err(DiscoveryError::protocol(format!(
-            "Protocol {:?} not available",
-            protocol_type
-        )));
+        Err(DiscoveryError::protocol(format!(
+            "Protocol {protocol_type:?} not available"
+        )))
     }
 
     /// Get a reference to the protocols map
@@ -204,7 +229,7 @@ mod tests {
 
         let service = ServiceInfo::new(
             "test_service",
-            "_http._tcp",
+            "_http._tcp.local.",
             8080,
             Some(vec![("version", "1.0")])
         )
