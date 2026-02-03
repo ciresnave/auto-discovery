@@ -52,7 +52,7 @@ hex = "0.4"
 
 # Additional networking
 tokio-util = { version = "0.7", features = ["net"] }
-bytes = "1.5"
+bytes = "1.11"
 
 # Production safety and monitoring
 governor = "0.10"
