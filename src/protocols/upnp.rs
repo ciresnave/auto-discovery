@@ -393,6 +393,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs real multicast; run with --ignored on a LAN"]
     async fn test_service_registration() {
         let config = DiscoveryConfig::new();
         let protocol = SsdpProtocol::new(config).unwrap();
@@ -404,6 +405,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "needs real multicast; run with --ignored on a LAN"]
     async fn test_service_discovery() {
         let config = DiscoveryConfig::new();
         let protocol = SsdpProtocol::new(config).unwrap();

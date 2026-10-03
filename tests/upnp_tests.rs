@@ -20,6 +20,7 @@ async fn test_ssdp_protocol_lifecycle() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore = "needs real multicast; run with --ignored on a LAN"]
 async fn test_ssdp_service_registration() -> Result<()> {
     let config = DiscoveryConfig::default();
     let mut ssdp = SsdpProtocol::new(config)?;
@@ -150,6 +151,7 @@ async fn test_ssdp_timeout_handling() -> Result<()> {
 }
 
 #[tokio::test]
+#[ignore = "needs real multicast; run with --ignored on a LAN"]
 async fn test_ssdp_multiple_services() -> Result<()> {
     let config = DiscoveryConfig::default();
     let mut ssdp = SsdpProtocol::new(config)?;
