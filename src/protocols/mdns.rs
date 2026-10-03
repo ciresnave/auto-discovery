@@ -8,7 +8,7 @@ use crate::{
     types::{ProtocolType, ServiceType},
 };
 use async_trait::async_trait;
-use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo as MdnsServiceInfo};
+use mdns_sd::{ResolvedService, ServiceDaemon, ServiceEvent, ServiceInfo as MdnsServiceInfo};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// mDNS protocol implementation for service discovery
@@ -68,28 +68,53 @@ impl MdnsProtocol {
     }
 
     #[allow(dead_code)]
-    fn convert_to_service_info(&self, mdns_info: MdnsServiceInfo) -> Result<ServiceInfo> {
-        let host = mdns_info.get_hostname().to_string();
-        let service_type = ServiceType::new(mdns_info.get_type())?;
-        let addresses = mdns_info.get_addresses();
-        let port = mdns_info.get_port();
+    /// Converts a resolved mDNS service into this crate's `ServiceInfo`.
+    ///
+    /// Since mdns-sd 0.21, `ServiceEvent::ServiceResolved` carries a
+    /// `ResolvedService` (public fields) rather than a `ServiceInfo` (getters).
+    /// The same four values are read as before: host, type, port, and the
+    /// first address. TXT records are still not parsed.
+    fn convert_to_service_info(&self, mdns_info: &ResolvedService) -> Result<ServiceInfo> {
+        // The service's name is its INSTANCE name: `fullname` minus the
+        // ".<type>" suffix ("my-svc._http._tcp.local." -> "my-svc"). This used
+        // the hostname, which is a different thing ("my-host.local."); it went
+        // unnoticed because no ServiceResolved event reached this code in the
+        // tests until mdns-sd 0.21.
+        let instance = mdns_info
+            .fullname
+            .strip_suffix(&mdns_info.ty_domain)
+            .and_then(|n| n.strip_suffix('.'))
+            .unwrap_or(&mdns_info.fullname)
+            .to_string();
+        let service_type = ServiceType::new(&mdns_info.ty_domain)?;
+        let port = mdns_info.port;
 
-        if addresses.is_empty() {
+        let Some(address) = mdns_info.addresses.iter().next().map(|a| a.to_ip_addr()) else {
             return Err(DiscoveryError::mdns("Service has no addresses"));
-        }
+        };
 
         // Convert TXT records to attributes (simplified)
         let attributes: HashMap<String, String> = HashMap::new(); // For now, skip TXT record parsing
 
-        let mut service = ServiceInfo::new(host, service_type, port, None)?;
+        let mut service = ServiceInfo::new(instance, service_type, port, None)?;
 
         service = service
             .with_protocol_type(ProtocolType::Mdns)
-            .with_address(*addresses.iter().next().unwrap())
+            .with_address(address)
             .with_attributes(attributes);
 
         Ok(service)
     }
+}
+
+/// Whether two records describe the same mDNS service instance: same instance
+/// name, same port, and the same service type up to a trailing ".local.".
+fn same_instance(a: &ServiceInfo, b: &ServiceInfo) -> bool {
+    fn ty(s: &ServiceInfo) -> String {
+        let t = s.service_type.to_string();
+        t.strip_suffix(".local.").map(str::to_string).unwrap_or(t)
+    }
+    a.name == b.name && a.port == b.port && ty(a) == ty(b)
 }
 
 #[async_trait]
@@ -133,7 +158,9 @@ impl super::DiscoveryProtocol for MdnsProtocol {
                     Ok(event) => {
                         match event {
                             ServiceEvent::ServiceResolved(info) => {
-                                if let Ok(service_info) = self.convert_to_service_info(info) {
+                                if let Ok(service_info) = self.convert_to_service_info(&info)
+                                    && !services.iter().any(|s| same_instance(s, &service_info))
+                                {
                                     services.push(service_info);
                                     tracing::debug!(
                                         "Discovered service: {}",
@@ -179,8 +206,13 @@ impl super::DiscoveryProtocol for MdnsProtocol {
                 });
 
                 if service_type_matches {
-                    // Only add if not already in discovered services
-                    if !discovered_services.iter().any(|ds| ds.id == service.id) {
+                    // Only add if not already discovered. Compare instance
+                    // identity, not `id`: a copy converted from the network
+                    // gets a fresh UUID, so an `id` check never matched it.
+                    if !discovered_services
+                        .iter()
+                        .any(|ds| ds.id == service.id || same_instance(ds, &service))
+                    {
                         discovered_services.push(service.clone());
                     }
                 }
@@ -285,7 +317,7 @@ mod tests {
 
         let service = ServiceInfo::new(
             "test_service",
-            "_test._tcp.local.",
+            "_ad-unit._tcp.local.",
             8080,
             Some(vec![("version", "1.0"), ("description", "Test service")]),
         )
@@ -304,7 +336,7 @@ mod tests {
         // Discover services with longer timeout for network operations
         let discovered = protocol
             .discover_services(
-                vec![ServiceType::new("_test._tcp.local.").unwrap()],
+                vec![ServiceType::new("_ad-unit._tcp.local.").unwrap()],
                 Some(Duration::from_secs(3)),
             )
             .await
