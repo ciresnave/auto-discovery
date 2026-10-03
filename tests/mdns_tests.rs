@@ -1,3 +1,5 @@
+#![cfg(feature = "mdns-sd")]
+
 use auto_discovery::{
     config::DiscoveryConfig,
     error::Result,
@@ -143,7 +145,7 @@ async fn test_mdns_multiple_services() -> Result<()> {
     let mut services = Vec::new();
     for i in 1..=3 {
         let service = ServiceInfo::new(
-            &format!("test-service-{}", i),
+            format!("test-service-{}", i),
             "_test._tcp",
             8080 + i as u16,
             Some(vec![("instance", &i.to_string())]),

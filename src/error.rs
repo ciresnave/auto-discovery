@@ -116,6 +116,7 @@ impl From<KeyRejected> for DiscoveryError {
     }
 }
 
+#[cfg(feature = "mdns-sd")]
 impl From<mdns_sd::Error> for DiscoveryError {
     fn from(err: mdns_sd::Error) -> Self {
         Self::Mdns(err.to_string())

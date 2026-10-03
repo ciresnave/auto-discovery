@@ -133,35 +133,6 @@ let runtime = runtime::Builder::new_multi_thread()
     .unwrap();
 ```
 
-## Monitoring and Metrics
-
-### Prometheus Integration
-
-```rust
-use auto_discovery::metrics::{MetricsConfig, PrometheusExporter};
-
-let metrics_config = MetricsConfig::builder()
-    .enable_prometheus()
-    .collection_interval(Duration::from_secs(15))
-    .build();
-
-// Example metrics
-// autodiscovery_services_total{protocol="mdns"} 42
-// autodiscovery_cache_hit_ratio{} 0.95
-// autodiscovery_discovery_duration_seconds{} 0.123
-```
-
-### Health Checks
-
-```rust
-use auto_discovery::health::{HealthConfig, HealthCheck};
-
-let health_config = HealthConfig::builder()
-    .check_interval(Duration::from_secs(30))
-    .failure_threshold(3)
-    .build();
-```
-
 ## Benchmark Results
 
 | Scenario | Services | Memory (MB) | CPU (%) | Network (KB/s) | Cache Hit % |

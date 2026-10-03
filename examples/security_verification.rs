@@ -98,10 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     // Check for authentication requirements
-                    if let Some(auth) = service.attributes.get("auth") {
-                        if auth == "required" {
-                            info!("  🔑 Authentication required");
-                        }
+                    if let Some(auth) = service.attributes.get("auth")
+                        && auth == "required"
+                    {
+                        info!("  🔑 Authentication required");
                     }
                 } else {
                     warn!("❌ Service '{}' failed verification", service.name());

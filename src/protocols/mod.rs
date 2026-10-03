@@ -11,8 +11,11 @@ use async_trait::async_trait;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::warn;
 
+#[cfg(feature = "dns-sd")]
 pub mod dns_sd;
+#[cfg(feature = "mdns-sd")]
 pub mod mdns;
+#[cfg(feature = "upnp")]
 pub mod upnp;
 
 // #[cfg(feature = "simple-mdns")]
@@ -58,10 +61,15 @@ pub struct ProtocolManager {
 impl ProtocolManager {
     /// Create a new protocol manager
     pub async fn new(config: DiscoveryConfig) -> Result<Self> {
+        #[cfg_attr(
+            not(any(feature = "mdns-sd", feature = "upnp", feature = "dns-sd")),
+            allow(unused_mut)
+        )]
         let mut protocols: HashMap<ProtocolType, Arc<dyn DiscoveryProtocol + Send + Sync>> =
             HashMap::new();
 
         // Initialize protocols based on config
+        #[cfg(feature = "mdns-sd")]
         if config.has_protocol(ProtocolType::Mdns) {
             // The `simple-mdns` backend never compiled: its module is disabled
             // ("API incompatibilities") and re-enabling it gives 23 errors. This
@@ -78,6 +86,7 @@ impl ProtocolManager {
             }
         }
 
+        #[cfg(feature = "upnp")]
         if config.has_protocol(ProtocolType::Upnp)
             && let Ok(ssdp) = upnp::SsdpProtocol::new(config.clone())
         {
@@ -87,6 +96,7 @@ impl ProtocolManager {
             );
         }
 
+        #[cfg(feature = "dns-sd")]
         if config.has_protocol(ProtocolType::DnsSd)
             && let Ok(dns_sd) = dns_sd::DnsSdProtocol::new(&config).await
         {
@@ -206,7 +216,8 @@ impl ProtocolManager {
     }
 }
 
-#[cfg(test)]
+// Every test here asserts behaviour of the mDNS backend.
+#[cfg(all(test, feature = "mdns-sd"))]
 mod tests {
     use super::*;
     use crate::config::DiscoveryConfig;

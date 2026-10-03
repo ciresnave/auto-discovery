@@ -11,14 +11,11 @@ use crate::{
 use async_trait::async_trait;
 use governor::{RateLimiter, clock::DefaultClock, state::keyed::DefaultKeyedStateStore};
 use std::{sync::Arc, time::Duration};
-use trust_dns_client::client::AsyncClient;
 
 /// DNS-SD (DNS Service Discovery) protocol implementation
 pub struct DnsSdProtocol {
     #[allow(dead_code)]
     config: DiscoveryConfig,
-    #[allow(dead_code)]
-    client: Arc<AsyncClient>,
     #[allow(dead_code)]
     rate_limiter: Arc<RateLimiter<String, DefaultKeyedStateStore<String>, DefaultClock>>,
     #[allow(dead_code)]
