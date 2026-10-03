@@ -1,7 +1,9 @@
 [package]
 name = "auto-discovery"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
+# Highest rust-version among locked dependencies (uuid 1.27); CI `msrv` job.
+rust-version = "1.89"
 authors = ["Eric Evans <ciresnave@gmail.com>"]
 description = "A general-purpose network and system service discovery library for Rust applications"
 license = "MIT OR Apache-2.0"
@@ -20,6 +22,10 @@ secure = ["dep:ring"]
 dns-sd = []
 mdns-sd = ["dep:mdns-sd"]
 upnp = []
+# Test-only: runs the tests that bind mDNS/SSDP sockets. Off by default so a
+# plain `cargo test` opens no sockets (each rebuilt test binary would raise
+# a firewall prompt). CI enables it via --all-features.
+network-tests = []
 
 [dependencies]
 tokio = { version = "1.53", features = ["full"] }
@@ -44,6 +50,14 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 [workspace]
 members = []
 resolver = "2"
+
+[[test]]
+name = "mdns_tests"
+required-features = ["network-tests", "mdns-sd"]
+
+[[test]]
+name = "upnp_tests"
+required-features = ["network-tests", "upnp"]
 
 [[bench]]
 name = "discovery_benchmarks"

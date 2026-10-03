@@ -307,6 +307,10 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_mdns_protocol() {
         let config = crate::config::DiscoveryConfig::new();
         let mut protocol = MdnsProtocol::new(&config).await.unwrap();

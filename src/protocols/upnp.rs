@@ -364,6 +364,10 @@ mod tests {
     use std::time::Duration;
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_ssdp_protocol_creation() {
         let config = DiscoveryConfig::new();
         let protocol = SsdpProtocol::new(config);
@@ -371,6 +375,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_search_target_parsing() {
         let message = "M-SEARCH * HTTP/1.1\r\nST: upnp:rootdevice\r\n\r\n";
         let target = SsdpProtocol::parse_search_target(message);
@@ -378,6 +386,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_service_matching() {
         let service = ServiceInfo::new("test-service", "upnp._tcp", 8080, None).unwrap();
 
