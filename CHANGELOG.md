@@ -53,6 +53,36 @@ what its documentation says it is.
   entry below claimed several of these as shipped features; it is corrected in
   place.**
 
+### Changed: dependencies brought current
+
+- **`mdns-sd` 0.13 → 0.21.** Since 0.21, `ServiceEvent::ServiceResolved`
+  carries a `ResolvedService` (public fields) instead of a `ServiceInfo`; the
+  converter is ported to it. **`From<mdns_sd::Error>` now refers to 0.21's error
+  type.**
+- **`base64` 0.22 → 0.23.** Only `Engine`, `STANDARD` and `DecodeError` are
+  used, and their behaviour is unchanged.
+- **`criterion` 0.6 → 0.8** (dev): the benches build with no warnings.
+- **`rand` removed** from both dependencies and dev-dependencies: it was never
+  used. The one `rand::` path in the code is `ring::rand::SystemRandom`.
+- The declared minimums of the in-range dependencies are raised to their
+  current versions.
+
+### Fixed: mDNS discovery results (visible now that resolution works)
+
+- **A discovered service's `name` is its instance name**, e.g. `my-svc` from
+  `my-svc._http._tcp.local.`. It used to be the **hostname**
+  (`my-host.local.`). That was a pre-existing bug: no `ServiceResolved` event
+  reached the converter in the tests until mdns-sd 0.21.
+- **Results no longer contain duplicates.** `discover_services` merges services
+  found on the network with locally registered ones. It de-duplicated by `id`,
+  but a network copy gets a fresh UUID, so the check never matched it and each
+  service was returned twice. It now compares instance identity: name, type
+  (up to a trailing `.local.`) and port. Repeated `ServiceResolved` events for
+  one instance are collapsed the same way.
+- **Test isolation:** each mDNS test now uses its own service type. With real
+  resolution working, concurrently running tests that shared `_test._tcp`
+  discovered each other's services.
+
 ### Fixed
 
 - **`--no-default-features` now builds.** Each protocol module, its protocol

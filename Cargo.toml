@@ -22,26 +22,24 @@ mdns-sd = ["dep:mdns-sd"]
 upnp = []
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-mdns-sd = { version = "0.13.11", optional = true }
-serde = { version = "1.0", features = ["derive"] }
-tracing = "0.1"
-uuid = { version = "1.0", features = ["v4", "serde"] }
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-rand = "0.9"
+tokio = { version = "1.53", features = ["full"] }
+mdns-sd = { version = "0.21.4", optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+tracing = "0.1.44"
+uuid = { version = "1.27", features = ["v4", "serde"] }
+async-trait = "0.1.92"
+chrono = { version = "0.4.45", features = ["serde"] }
 
 # Security and verification
-ring = { version = "0.17", optional = true }
-base64 = "0.22"
+ring = { version = "0.17.14", optional = true }
+base64 = "0.23.1"
 
 # Production safety
-governor = "0.10"
+governor = "0.10.4"
 
 [dev-dependencies]
-criterion = { version = "0.6", features = ["html_reports", "async_tokio"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-rand = "0.9"
+criterion = { version = "0.8.2", features = ["html_reports", "async_tokio"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [workspace]
 members = []

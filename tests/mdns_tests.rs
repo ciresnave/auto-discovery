@@ -28,7 +28,7 @@ async fn test_mdns_service_registration() -> Result<()> {
 
     let service = ServiceInfo::new(
         "test-service",
-        "_test._tcp",
+        "_ad-reg._tcp",
         8080,
         Some(vec![("version", "1.0")]),
     )?
@@ -48,7 +48,7 @@ async fn test_mdns_service_registration() -> Result<()> {
     // due to networking and timing constraints. This is expected behavior.
     let services = mdns
         .discover_services(
-            vec![ServiceType::new("_test._tcp")?],
+            vec![ServiceType::new("_ad-reg._tcp")?],
             Some(Duration::from_secs(1)),
         )
         .await?;
@@ -75,7 +75,7 @@ async fn test_mdns_service_verification() -> Result<()> {
 
     let service = ServiceInfo::new(
         "test-verify-service",
-        "_test._tcp",
+        "_ad-verify._tcp",
         8081,
         Some(vec![("version", "1.0")]),
     )?
@@ -127,7 +127,7 @@ async fn test_mdns_invalid_service() -> Result<()> {
     // Try to create an invalid service (empty name should cause an error in ServiceInfo::new)
     let invalid_service_result = ServiceInfo::new(
         "", // Empty name should cause validation error
-        "_test._tcp",
+        "_ad-invalid._tcp",
         0, // Invalid port
         None,
     );
@@ -146,7 +146,7 @@ async fn test_mdns_multiple_services() -> Result<()> {
     for i in 1..=3 {
         let service = ServiceInfo::new(
             format!("test-service-{}", i),
-            "_test._tcp",
+            "_ad-multi._tcp",
             8080 + i as u16,
             Some(vec![("instance", &i.to_string())]),
         )?
@@ -170,7 +170,7 @@ async fn test_mdns_multiple_services() -> Result<()> {
     // Discover and verify all services
     let discovered = mdns
         .discover_services(
-            vec![ServiceType::new("_test._tcp")?],
+            vec![ServiceType::new("_ad-multi._tcp")?],
             Some(Duration::from_secs(1)),
         )
         .await?;
@@ -194,7 +194,7 @@ async fn test_mdns_reconnection() -> Result<()> {
     drop(mdns);
     let mdns = MdnsProtocol::new(&config).await?;
 
-    let service = ServiceInfo::new("reconnect-test", "_test._tcp", 8082, None)?
+    let service = ServiceInfo::new("reconnect-test", "_ad-reconn._tcp", 8082, None)?
         .with_address(
             IpAddr::from_str("127.0.0.1")
                 .map_err(|e| auto_discovery::error::DiscoveryError::network(e.to_string()))?,
