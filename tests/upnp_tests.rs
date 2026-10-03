@@ -1,3 +1,5 @@
+#![cfg(feature = "upnp")]
+
 use auto_discovery::{
     config::DiscoveryConfig,
     error::Result,
@@ -170,7 +172,7 @@ async fn test_ssdp_multiple_services() -> Result<()> {
     let mut services = Vec::new();
     for i in 1..=3 {
         let service = ServiceInfo::new(
-            &format!("test-service-{}", i),
+            format!("test-service-{}", i),
             "urn:test-service-type",
             8080 + i as u16,
             Some(vec![("instance", &i.to_string())]),
@@ -311,7 +313,7 @@ async fn test_ssdp_concurrent_operations() -> Result<()> {
         let ssdp_clone = ssdp.clone();
         let handle = tokio::spawn(async move {
             let service = ServiceInfo::new(
-                &format!("concurrent-service-{}", i),
+                format!("concurrent-service-{}", i),
                 "urn:test-service-type",
                 8084 + i as u16,
                 None,

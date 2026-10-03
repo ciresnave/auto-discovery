@@ -81,7 +81,7 @@ impl ServiceVerifier {
             .filter(|(k, _)| *k != "signature" && *k != "timestamp")
             .collect();
 
-        sorted_attrs.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        sorted_attrs.sort_by_key(|(k1, _)| *k1);
 
         let mut message = format!(
             "{}|{}|{}|{}",

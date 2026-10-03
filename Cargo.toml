@@ -16,13 +16,13 @@ default = ["dns-sd", "mdns-sd", "upnp"]
 # a backend that never built): `mdns`, `simple-mdns`, `basic-mdns`,
 # `metrics`, `testing`. `secure` keeps only `ring`, the one it uses.
 secure = ["dep:ring"]
-dns-sd = ["trust-dns-client/dnssec"]
+# Gates the DNS-SD module, which is still a stub ("not yet implemented").
+dns-sd = []
 mdns-sd = ["dep:mdns-sd"]
 upnp = []
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
-trust-dns-client = { version = "0.23", features = ["dnssec"], optional = true }
 mdns-sd = { version = "0.13.11", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
