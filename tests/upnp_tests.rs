@@ -83,6 +83,10 @@ async fn test_ssdp_service_registration() -> Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS runner returns EHOSTUNREACH for multicast; run with --ignored on a LAN"
+)]
 async fn test_ssdp_service_verification() -> Result<()> {
     let config = DiscoveryConfig::default();
     let mut ssdp = SsdpProtocol::new(config)?;
@@ -133,6 +137,10 @@ async fn test_ssdp_service_verification() -> Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS runner returns EHOSTUNREACH for multicast; run with --ignored on a LAN"
+)]
 async fn test_ssdp_timeout_handling() -> Result<()> {
     let config = DiscoveryConfig::default();
     let ssdp = SsdpProtocol::new(config)?;
@@ -229,6 +237,10 @@ async fn test_ssdp_multiple_services() -> Result<()> {
 }
 
 #[tokio::test]
+#[cfg_attr(
+    target_os = "macos",
+    ignore = "macOS runner returns EHOSTUNREACH for multicast; run with --ignored on a LAN"
+)]
 async fn test_ssdp_rate_limiting() -> Result<()> {
     let config = DiscoveryConfig::default();
     let mut ssdp = SsdpProtocol::new(config)?;
