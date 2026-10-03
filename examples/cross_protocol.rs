@@ -1,13 +1,13 @@
 //! Example demonstrating cross-protocol service discovery
-//! 
+//!
 //! This example shows how to discover services across multiple protocols
 //! and handle different protocol-specific features.
 
 use auto_discovery::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
 use std::time::Duration;
 use tracing::info;
@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_timeout(Duration::from_secs(10))
         .with_verify_services(true)
         .with_service_type(ServiceType::new("_http._tcp")?) // mDNS service type
-        .with_service_type(ServiceType::new("_ssh._tcp")?)  // SSH services
+        .with_service_type(ServiceType::new("_ssh._tcp")?) // SSH services
         .with_protocol(ProtocolType::Mdns)
         .with_protocol(ProtocolType::Upnp)
         .with_protocol(ProtocolType::DnsSd)
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ("version", "1.0"),
             ("protocol", "multi"),
             ("discovery", "cross-protocol"),
-        ])
+        ]),
     )?;
 
     info!("Registering service: {}", service.name());
@@ -55,24 +55,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Discover services using mDNS
     info!("Discovering services via mDNS...");
-    let mdns_services = discovery.discover_services(Some(ProtocolType::Mdns)).await?;
+    let mdns_services = discovery
+        .discover_services(Some(ProtocolType::Mdns))
+        .await?;
     info!("Found {} services via mDNS", mdns_services.len());
     for service in &mdns_services {
-        info!("  mDNS: {} at {}:{}", service.name(), service.address(), service.port());
+        info!(
+            "  mDNS: {} at {}:{}",
+            service.name(),
+            service.address(),
+            service.port()
+        );
     }
 
     // Discover services using UPnP
     info!("Discovering services via UPnP...");
-    let upnp_services = discovery.discover_services(Some(ProtocolType::Upnp)).await?;
+    let upnp_services = discovery
+        .discover_services(Some(ProtocolType::Upnp))
+        .await?;
     info!("Found {} services via UPnP", upnp_services.len());
     for service in &upnp_services {
-        info!("  UPnP: {} at {}:{}", service.name(), service.address(), service.port());
+        info!(
+            "  UPnP: {} at {}:{}",
+            service.name(),
+            service.address(),
+            service.port()
+        );
     }
 
     // Discover services across all protocols
     info!("Discovering services across all protocols...");
     let all_services = discovery.discover_services(None).await?;
-    info!("Found {} total services across all protocols", all_services.len());
+    info!(
+        "Found {} total services across all protocols",
+        all_services.len()
+    );
 
     // Group services by protocol for analysis
     let mut protocol_counts = std::collections::HashMap::new();
@@ -89,7 +106,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Find services that are discoverable via multiple protocols
     let mut service_names = std::collections::HashMap::new();
     for service in &all_services {
-        let protocols = service_names.entry(service.name().to_string()).or_insert(Vec::new());
+        let protocols = service_names
+            .entry(service.name().to_string())
+            .or_insert(Vec::new());
         protocols.push(service.protocol_type());
     }
 

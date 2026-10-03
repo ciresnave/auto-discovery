@@ -1,34 +1,33 @@
 //! # Auto Discovery
-//! 
+//!
 //! A production-ready service discovery library for Rust applications.
-//! 
+//!
 //! This crate provides a robust, secure, and extensible service discovery solution
 //! supporting multiple protocols (mDNS, DNS-SD, UPnP) with production-grade features
 //! including caching, health monitoring, metrics, and security.
-//! 
+//!
 //! ## Features
-//! 
+//!
 //! - Multiple protocol support (mDNS, DNS-SD, UPnP)
 //! - Async-first design using Tokio
 //! - Production safety features (caching, rate limiting, health checks)
 //! - Comprehensive security (TSIG, TLS, certificate pinning)
 //! - Prometheus metrics integration
 //! - Cross-platform support (Windows, Linux, macOS)
-//! 
+//!
 //! ## Quick Start
-//! 
-//! ```rust
+//!
+//! ```rust,no_run
 //! use auto_discovery::{
 //!     config::DiscoveryConfig,
 //!     discovery::ServiceDiscovery,
 //!     types::{ProtocolType, ServiceType},
 //! };
-//! 
+//!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create configuration with service types
-//!     let mut config = DiscoveryConfig::new();
-//!     config.add_service_type(ServiceType::new("_http._tcp")?);
+//!     let config = DiscoveryConfig::new().with_service_type(ServiceType::new("_http._tcp")?);
 //!     
 //!     // Initialize service discovery
 //!     let discovery = ServiceDiscovery::new(config).await?;
@@ -49,7 +48,7 @@
 //!
 //! ## Advanced Usage
 //!
-//! ```rust
+//! ```rust,no_run
 //! use auto_discovery::{
 //!     config::DiscoveryConfig,
 //!     discovery::ServiceDiscovery,
@@ -61,16 +60,15 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Configure discovery with service types
-//!     let mut config = DiscoveryConfig::new();
-//!     config.add_service_type(ServiceType::new("_myservice._tcp")?);
+//!     let config = DiscoveryConfig::new().with_service_type(ServiceType::new("_myservice._tcp")?);
 //!     
 //!     // Initialize service discovery
 //!     let mut discovery = ServiceDiscovery::new(config).await?;
 //!     
 //!     // Register our service
 //!     let service = ServiceInfo::new(
-//!         "My Service Instance", 
-//!         "_myservice._tcp", 
+//!         "My Service Instance",
+//!         "_myservice._tcp",
 //!         8080,
 //!         Some(vec![("version", "1.0"), ("feature", "basic")])
 //!     )?;
@@ -80,7 +78,7 @@
 //!     let services = discovery.discover_services(None).await?;
 //!     
 //!     for service in services {
-//!         println!("Found service: {} at {}:{}", 
+//!         println!("Found service: {} at {}:{}",
 //!             service.name,
 //!             service.address,
 //!             service.port);
@@ -94,7 +92,7 @@
 //!
 //! The library uses a protocol manager to handle multiple discovery protocols:
 //!
-//! ```rust
+//! ```rust,no_run
 //! use auto_discovery::protocols::ProtocolManager;
 //! use auto_discovery::config::DiscoveryConfig;
 //!
@@ -104,7 +102,6 @@
 //!     let manager = ProtocolManager::new(config).await?;
 //!     Ok(())
 //! }
-//! ```
 //! ```
 //!
 //! ## Error Handling
@@ -182,17 +179,17 @@ pub mod config;
 pub mod discovery;
 pub mod error;
 pub mod protocols;
-pub mod registry;  // Service registry for managing discovered and registered services
-pub mod service;
-pub mod simple;  // Simple API for common use cases
-pub mod types;
-pub mod utils;
+pub mod registry; // Service registry for managing discovered and registered services
 #[cfg(feature = "secure")]
 pub mod security;
+pub mod service;
+pub mod simple; // Simple API for common use cases
+pub mod types;
+pub mod utils;
 
 // Re-export main types for convenience
 pub use config::DiscoveryConfig;
 pub use discovery::ServiceDiscovery;
 pub use error::{DiscoveryError, Result};
-pub use service::{ServiceInfo, ServiceEvent};
-pub use types::{ServiceType, ProtocolType};
+pub use service::{ServiceEvent, ServiceInfo};
+pub use types::{ProtocolType, ServiceType};

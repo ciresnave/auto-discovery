@@ -11,9 +11,9 @@ use async_trait::async_trait;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::warn;
 
+pub mod dns_sd;
 pub mod mdns;
 pub mod upnp;
-pub mod dns_sd;
 
 // #[cfg(feature = "simple-mdns")]
 // pub mod simple_mdns; // Disabled due to API incompatibilities
@@ -58,34 +58,42 @@ pub struct ProtocolManager {
 impl ProtocolManager {
     /// Create a new protocol manager
     pub async fn new(config: DiscoveryConfig) -> Result<Self> {
-        let mut protocols: HashMap<ProtocolType, Arc<dyn DiscoveryProtocol + Send + Sync>> = HashMap::new();
+        let mut protocols: HashMap<ProtocolType, Arc<dyn DiscoveryProtocol + Send + Sync>> =
+            HashMap::new();
 
         // Initialize protocols based on config
         if config.has_protocol(ProtocolType::Mdns) {
-            #[cfg(all(feature = "simple-mdns", not(feature = "mdns")))]
-            {
-                if let Ok(mdns) = simple_mdns::SimpleMdnsProtocol::new(&config).await {
-                    protocols.insert(ProtocolType::Mdns, Arc::new(mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>);
-                }
-            }
-            #[cfg(not(feature = "simple-mdns"))]
-            {
-                if let Ok(mdns) = mdns::MdnsProtocol::new(&config).await {
-                    protocols.insert(ProtocolType::Mdns, Arc::new(mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>);
-                }
-            }
-        }
-
-        if config.has_protocol(ProtocolType::Upnp) {
-            if let Ok(ssdp) = upnp::SsdpProtocol::new(config.clone()) {
-                protocols.insert(ProtocolType::Upnp, Arc::new(ssdp) as Arc<dyn DiscoveryProtocol + Send + Sync>);
+            // The `simple-mdns` backend never compiled: its module is disabled
+            // ("API incompatibilities") and re-enabling it gives 23 errors. This
+            // call site still referenced it under `cfg(feature = "simple-mdns")`,
+            // so that feature (and therefore `--all-features`) did not build, and
+            // with both `simple-mdns` and `mdns` enabled NEITHER branch ran, so
+            // mDNS silently vanished. Every configuration now uses the working
+            // mdns-sd backend; the dead `simple-mdns` feature is removed in 0.3.0.
+            if let Ok(mdns) = mdns::MdnsProtocol::new(&config).await {
+                protocols.insert(
+                    ProtocolType::Mdns,
+                    Arc::new(mdns) as Arc<dyn DiscoveryProtocol + Send + Sync>,
+                );
             }
         }
 
-        if config.has_protocol(ProtocolType::DnsSd) {
-            if let Ok(dns_sd) = dns_sd::DnsSdProtocol::new(&config).await {
-                protocols.insert(ProtocolType::DnsSd, Arc::new(dns_sd) as Arc<dyn DiscoveryProtocol + Send + Sync>);
-            }
+        if config.has_protocol(ProtocolType::Upnp)
+            && let Ok(ssdp) = upnp::SsdpProtocol::new(config.clone())
+        {
+            protocols.insert(
+                ProtocolType::Upnp,
+                Arc::new(ssdp) as Arc<dyn DiscoveryProtocol + Send + Sync>,
+            );
+        }
+
+        if config.has_protocol(ProtocolType::DnsSd)
+            && let Ok(dns_sd) = dns_sd::DnsSdProtocol::new(&config).await
+        {
+            protocols.insert(
+                ProtocolType::DnsSd,
+                Arc::new(dns_sd) as Arc<dyn DiscoveryProtocol + Send + Sync>,
+            );
         }
 
         // simple-mdns implementation is disabled due to API incompatibilities
@@ -118,7 +126,10 @@ impl ProtocolManager {
         let mut all_services = Vec::new();
 
         for protocol in self.protocols.values() {
-            match protocol.discover_services(service_types.clone(), timeout).await {
+            match protocol
+                .discover_services(service_types.clone(), timeout)
+                .await
+            {
                 Ok(services) => all_services.extend(services),
                 Err(e) => warn!(
                     "Error discovering services with protocol {:?}: {}",
@@ -141,7 +152,9 @@ impl ProtocolManager {
         if let Some(protocol) = self.protocols.get(&protocol_type) {
             return protocol.discover_services(service_types, timeout).await;
         }
-        Err(DiscoveryError::protocol(format!("Protocol {protocol_type:?} not available")))
+        Err(DiscoveryError::protocol(format!(
+            "Protocol {protocol_type:?} not available"
+        )))
     }
 
     /// Register a service with the appropriate protocol
@@ -150,7 +163,7 @@ impl ProtocolManager {
         if let Some(protocol) = self.protocols.get(&protocol_type) {
             return protocol.register_service(service).await;
         }
-        
+
         Err(DiscoveryError::protocol(format!(
             "Protocol {protocol_type:?} not available"
         )))
@@ -232,7 +245,7 @@ mod tests {
             "test_service",
             "_http._tcp.local.",
             8080,
-            Some(vec![("version", "1.0")])
+            Some(vec![("version", "1.0")]),
         )
         .unwrap()
         .with_protocol_type(ProtocolType::Mdns);

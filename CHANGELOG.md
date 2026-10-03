@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - Unreleased
+
+Non-breaking. This release makes CI able to pass, and picks up patched versions
+of transitive dependencies.
+
+### Fixed
+
+- **`--features simple-mdns` did not compile** (`E0433`). The `simple_mdns`
+  module had been disabled, but the protocol manager still called it. As a
+  result `--all-features`, and so CI's `cargo test --all-features`, could never
+  build. With both `simple-mdns` and `mdns` enabled, neither mDNS branch ran,
+  so mDNS silently disappeared. Every configuration now uses the working mdns-sd
+  backend. The dead `simple-mdns` backend is removed in 0.3.0.
+- **Three crate-level doc examples did not compile.** They called a nonexistent
+  `DiscoveryConfig::add_service_type`; the real API is `with_service_type`. A
+  stray code fence turned prose into code. The three examples that perform live
+  network discovery are marked `no_run`: they are still compiled, but not
+  executed.
+- `clippy -D warnings`: six `collapsible_if` fixes.
+
+### Security
+
+- Refreshed `Cargo.lock` to the latest in-range versions. Advisory hits across
+  the locked dependency graph (OSV, 2026-10-03) fell from **50 across 22 crates
+  to 10 across 8**. That clears the patched advisories in `aws-lc-sys`,
+  `bytes`, `crossbeam-epoch`, `event-listener`, `h2`, `openssl`, `rand`,
+  `rustls`, `rustls-webpki`, `slab`, `time` and `tracing-subscriber`.
+- **Remaining, and fixed in 0.3.0:**
+  - `trust-dns` 0.23 (renamed to `hickory-dns`, RUSTSEC-2025-0017), which pulls
+    in `idna` 0.4 (RUSTSEC-2024-0421);
+  - `quick-xml` 0.38 (RUSTSEC-2026-0194/0195);
+  - `backoff` and `instant` (unmaintained);
+  - `async-std`, `net2` and `proc-macro-error`, all unmaintained and all pulled
+    in by the optional `mdns` 3.0 dependency.
+
+### Changed
+
+- The whole crate is now `rustfmt`-formatted, which CI's `cargo fmt --check`
+  requires. That is most of this diff, and is formatting only.
+
 ## [0.2.0] - 2025-07-15
 
 ### Added

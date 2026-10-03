@@ -1,13 +1,13 @@
 //! Example demonstrating the builder pattern for configuration
-//! 
+//!
 //! This example shows how to use the builder pattern to create
 //! discovery configurations and protocol managers.
 
 use auto_discovery::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
 use std::time::Duration;
 use tracing::info;
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ("version", "1.0"),
             ("api", "REST"),
             ("build_tool", "builder_pattern"),
-        ])
+        ]),
     )?;
 
     info!("Service created: {}", service.name());
@@ -53,11 +53,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("Service registered successfully");
 
     // Discover services using the configured discovery
-    let services = discovery.discover_services(Some(ProtocolType::Mdns)).await?;
+    let services = discovery
+        .discover_services(Some(ProtocolType::Mdns))
+        .await?;
 
-    info!("Discovered {} services using builder-configured discovery", services.len());
+    info!(
+        "Discovered {} services using builder-configured discovery",
+        services.len()
+    );
     for service in services {
-        info!("  - {} at {}:{}", service.name(), service.address(), service.port());
+        info!(
+            "  - {} at {}:{}",
+            service.name(),
+            service.address(),
+            service.port()
+        );
     }
 
     // Cleanup

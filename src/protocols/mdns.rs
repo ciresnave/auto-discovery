@@ -9,11 +9,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo as MdnsServiceInfo};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// mDNS protocol implementation for service discovery
 pub struct MdnsProtocol {
@@ -26,13 +22,13 @@ pub struct MdnsProtocol {
 
 impl MdnsProtocol {
     /// Create a new mDNS protocol instance
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `config` - The discovery configuration to use
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the mDNS daemon cannot be initialized
     pub async fn new(config: &DiscoveryConfig) -> Result<Self> {
         // Try to create daemon with a retry mechanism
@@ -59,12 +55,14 @@ impl MdnsProtocol {
                     if attempt < 3 {
                         tokio::time::sleep(Duration::from_millis(100 * attempt)).await;
                     } else {
-                        return Err(DiscoveryError::mdns(format!("Failed to create mDNS daemon after {attempt} attempts: {e}")));
+                        return Err(DiscoveryError::mdns(format!(
+                            "Failed to create mDNS daemon after {attempt} attempts: {e}"
+                        )));
                     }
                 }
             }
         }
-        
+
         // This should never be reached
         Err(DiscoveryError::mdns("Unexpected error in daemon creation"))
     }
@@ -83,12 +81,7 @@ impl MdnsProtocol {
         // Convert TXT records to attributes (simplified)
         let attributes: HashMap<String, String> = HashMap::new(); // For now, skip TXT record parsing
 
-        let mut service = ServiceInfo::new(
-            host,
-            service_type,
-            port,
-            None,
-        )?;
+        let mut service = ServiceInfo::new(host, service_type, port, None)?;
 
         service = service
             .with_protocol_type(ProtocolType::Mdns)
@@ -116,7 +109,7 @@ impl super::DiscoveryProtocol for MdnsProtocol {
     ) -> Result<Vec<ServiceInfo>> {
         let mut discovered_services = Vec::new();
         let discovery_timeout = timeout.unwrap_or(Duration::from_secs(5));
-        
+
         for service_type in &service_types {
             // Format service type for mDNS - ensure it ends with .local.
             let service_type_str = if service_type.to_string().ends_with(".local.") {
@@ -124,15 +117,17 @@ impl super::DiscoveryProtocol for MdnsProtocol {
             } else {
                 format!("{service_type}.local.")
             };
-            
-            let receiver = self.daemon.browse(&service_type_str)
+
+            let receiver = self
+                .daemon
+                .browse(&service_type_str)
                 .map_err(|e| DiscoveryError::mdns(format!("Failed to browse services: {e}")))?;
 
             // Collect services with timeout
             let mut services = Vec::new();
             let start_time = std::time::Instant::now();
             let per_attempt_timeout = std::cmp::min(discovery_timeout, Duration::from_millis(500));
-            
+
             while start_time.elapsed() < discovery_timeout {
                 match receiver.recv_timeout(per_attempt_timeout) {
                     Ok(event) => {
@@ -140,19 +135,22 @@ impl super::DiscoveryProtocol for MdnsProtocol {
                             ServiceEvent::ServiceResolved(info) => {
                                 if let Ok(service_info) = self.convert_to_service_info(info) {
                                     services.push(service_info);
-                                    tracing::debug!("Discovered service: {}", services.last().unwrap().name());
+                                    tracing::debug!(
+                                        "Discovered service: {}",
+                                        services.last().unwrap().name()
+                                    );
                                 }
-                            },
+                            }
                             ServiceEvent::SearchStopped(_) => {
                                 tracing::debug!("mDNS search stopped");
                                 break;
-                            },
+                            }
                             _ => {
                                 // Continue for other events
                                 continue;
                             }
                         }
-                    },
+                    }
                     Err(_) => {
                         // Timeout - check if we should continue
                         if start_time.elapsed() >= discovery_timeout {
@@ -162,7 +160,7 @@ impl super::DiscoveryProtocol for MdnsProtocol {
                     }
                 }
             }
-            
+
             discovered_services.extend(services);
         }
 
@@ -174,12 +172,12 @@ impl super::DiscoveryProtocol for MdnsProtocol {
                     // Compare the service types, handling both with and without .local.
                     let st_str = st.to_string();
                     let service_type_str = service.service_type.to_string();
-                    
-                    st_str == service_type_str ||
-                    format!("{st_str}.local.") == service_type_str ||
-                    st_str == format!("{service_type_str}.local.")
+
+                    st_str == service_type_str
+                        || format!("{st_str}.local.") == service_type_str
+                        || st_str == format!("{service_type_str}.local.")
                 });
-                
+
                 if service_type_matches {
                     // Only add if not already in discovered services
                     if !discovered_services.iter().any(|ds| ds.id == service.id) {
@@ -216,14 +214,18 @@ impl super::DiscoveryProtocol for MdnsProtocol {
             service.address,
             service.port,
             txt_records.as_slice(),
-        ).map_err(|e| DiscoveryError::mdns(format!("Failed to create mDNS service info: {e}")))?;
+        )
+        .map_err(|e| DiscoveryError::mdns(format!("Failed to create mDNS service info: {e}")))?;
 
-        self.daemon.register(mdns_info)
+        self.daemon
+            .register(mdns_info)
             .map_err(|e| DiscoveryError::mdns(format!("Failed to register service: {e}")))?;
 
         // Track registered service for verification
         if let Some(registry) = &self.registry {
-            registry.register_local_service(service.clone(), ProtocolType::Mdns).await?;
+            registry
+                .register_local_service(service.clone(), ProtocolType::Mdns)
+                .await?;
         }
 
         Ok(())
@@ -236,18 +238,19 @@ impl super::DiscoveryProtocol for MdnsProtocol {
         } else {
             format!("{}.local.", service.service_type)
         };
-        
+
         let full_service_name = format!("{}.{}", service.name, service_type_str);
-        
-        self.daemon.unregister(&full_service_name)
+
+        self.daemon
+            .unregister(&full_service_name)
             .map_err(|e| DiscoveryError::mdns(format!("Failed to unregister service: {e}")))?;
-        
+
         // Remove from registry
         if let Some(registry) = &self.registry {
             let service_id = format!("{}:{}:{}", service.name, service.service_type, service.port);
             registry.unregister_local_service(&service_id).await?;
         }
-        
+
         Ok(())
     }
 
@@ -275,7 +278,7 @@ mod tests {
     async fn test_mdns_protocol() {
         let config = crate::config::DiscoveryConfig::new();
         let mut protocol = MdnsProtocol::new(&config).await.unwrap();
-        
+
         // Set up a registry for the protocol
         let registry = Arc::new(crate::registry::ServiceRegistry::new());
         protocol.set_registry(registry);
@@ -284,14 +287,14 @@ mod tests {
             "test_service",
             "_test._tcp.local.",
             8080,
-            Some(vec![("version", "1.0"), ("description", "Test service")])
+            Some(vec![("version", "1.0"), ("description", "Test service")]),
         )
         .unwrap()
         .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
 
         // Test using trait methods directly
         use crate::protocols::DiscoveryProtocol;
-        
+
         // Register service
         protocol.register_service(service.clone()).await.unwrap();
 
@@ -302,7 +305,7 @@ mod tests {
         let discovered = protocol
             .discover_services(
                 vec![ServiceType::new("_test._tcp.local.").unwrap()],
-                Some(Duration::from_secs(3))
+                Some(Duration::from_secs(3)),
             )
             .await
             .unwrap();

@@ -1,5 +1,5 @@
 //! Basic usage example for the auto-discovery library
-//! 
+//!
 //! This example demonstrates the core functionality including:
 //! - Service registration
 //! - Service discovery
@@ -7,13 +7,13 @@
 //! - Proper error handling
 
 use auto_discovery::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
-use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
 use tracing::info;
 
 #[tokio::main]
@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ("path", "/api"),
             ("protocol", "HTTP/1.1"),
             ("health", "/health"),
-        ])
+        ]),
     )?
     .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
 
@@ -61,10 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Example SSH Server",
         "_ssh._tcp",
         22,
-        Some(vec![
-            ("version", "OpenSSH_8.0"),
-            ("auth", "publickey"),
-        ])
+        Some(vec![("version", "OpenSSH_8.0"), ("auth", "publickey")]),
     )?
     .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
 
@@ -78,13 +75,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start discovery to find services on the network
     info!("🔍 Starting service discovery...");
     let discovered_services = discovery.discover_services(None).await?;
-    
+
     info!("📊 Found {} services:", discovered_services.len());
     for (i, service) in discovered_services.iter().enumerate() {
         info!("  {}. {} ({})", i + 1, service.name(), service.service_type);
         info!("     Address: {}:{}", service.address, service.port);
         info!("     Protocol: {}", service.protocol_type);
-        
+
         if !service.attributes.is_empty() {
             info!("     Attributes:");
             for (key, value) in &service.attributes {
@@ -96,11 +93,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Demonstrate protocol filtering - discover only mDNS services
     info!("🔎 Discovering only mDNS services...");
-    let mdns_services = discovery.discover_services(Some(ProtocolType::Mdns)).await?;
-    
+    let mdns_services = discovery
+        .discover_services(Some(ProtocolType::Mdns))
+        .await?;
+
     info!("📊 Found {} mDNS services:", mdns_services.len());
     for service in &mdns_services {
-        info!("  - {} at {}:{}", service.name(), service.address, service.port);
+        info!(
+            "  - {} at {}:{}",
+            service.name(),
+            service.address,
+            service.port
+        );
     }
 
     // Cleanup - unregister our services

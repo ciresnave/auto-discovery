@@ -4,11 +4,11 @@
 //! service discovery scenarios.
 
 use crate::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     error::Result,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
 use std::time::Duration;
 
@@ -19,17 +19,17 @@ pub struct SimpleDiscovery {
 
 impl SimpleDiscovery {
     /// Create a new simple discovery instance with defaults
-    /// 
+    ///
     /// Automatically configures:
-    /// - mDNS protocol 
+    /// - mDNS protocol
     /// - Common service types (_http._tcp, _https._tcp, _ssh._tcp, _ftp._tcp)
     /// - 5-second timeout
     /// - Service verification enabled
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// use auto_discovery::simple::SimpleDiscovery;
-    /// 
+    ///
     /// #[tokio::main]
     /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let discovery = SimpleDiscovery::new().await?;
@@ -63,11 +63,11 @@ impl SimpleDiscovery {
     }
 
     /// Register a simple HTTP service
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// # use auto_discovery::simple::SimpleDiscovery;
-    /// # #[tokio::main] 
+    /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let discovery = SimpleDiscovery::new().await?;
     /// discovery.register_http_service("My Web App", 8080).await?;
@@ -81,11 +81,11 @@ impl SimpleDiscovery {
 
     /// Register a service with custom attributes
     pub async fn register_service_with_attributes(
-        &self, 
-        name: &str, 
-        service_type: &str, 
+        &self,
+        name: &str,
+        service_type: &str,
         port: u16,
-        attributes: Vec<(&str, &str)>
+        attributes: Vec<(&str, &str)>,
     ) -> Result<()> {
         let service = ServiceInfo::new(name, service_type, port, Some(attributes))?;
         self.inner.register_service(service).await
@@ -105,11 +105,11 @@ impl SimpleDiscovery {
 /// Quick one-liner functions for common scenarios
 ///
 /// Discover all HTTP services on the network
-/// 
+///
 /// # Example
 /// ```rust
 /// use auto_discovery::simple::discover_http_services;
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let services = discover_http_services().await?;
@@ -125,11 +125,11 @@ pub async fn discover_http_services() -> Result<Vec<ServiceInfo>> {
 }
 
 /// Register an HTTP service and return a handle for cleanup
-/// 
+///
 /// # Example
 /// ```rust
 /// use auto_discovery::simple::register_http_service;
-/// 
+///
 /// #[tokio::main]
 /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ///     let handle = register_http_service("My API", 8080).await?;
@@ -144,7 +144,7 @@ pub async fn register_http_service(name: &str, port: u16) -> Result<ServiceHandl
     let discovery = SimpleDiscovery::new().await?;
     let service = ServiceInfo::new(name, "_http._tcp", port, None)?;
     discovery.inner.register_service(service.clone()).await?;
-    Ok(ServiceHandle { 
+    Ok(ServiceHandle {
         discovery: discovery.inner,
         service,
     })
@@ -175,7 +175,7 @@ mod tests {
     #[tokio::test]
     async fn test_simple_discovery() {
         let discovery = SimpleDiscovery::new().await.unwrap();
-        
+
         // Should not fail even if no services found
         let services = discovery.discover_all().await.unwrap();
         // Can't assert specific count since it depends on network
@@ -186,7 +186,7 @@ mod tests {
     async fn test_register_http_service() {
         let discovery = SimpleDiscovery::new().await.unwrap();
         let result = discovery.register_http_service("Test Service", 8080).await;
-        
+
         // Registration might fail in test environment
         match result {
             Ok(_) => {
@@ -202,7 +202,7 @@ mod tests {
     async fn test_one_liner_functions() {
         // Test the one-liner function
         let result = discover_http_services().await;
-        
+
         // Should not panic even if discovery fails
         match result {
             Ok(_services) => {

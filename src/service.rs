@@ -43,10 +43,10 @@ impl ServiceInfo {
         name: impl Into<String>,
         service_type: impl Into<String>,
         port: u16,
-        attributes: Option<Vec<(&str, &str)>>
+        attributes: Option<Vec<(&str, &str)>>,
     ) -> Result<Self, crate::error::DiscoveryError> {
         let name = name.into();
-        
+
         // Validate name is not empty
         if name.trim().is_empty() {
             return Err(crate::error::DiscoveryError::InvalidServiceInfo {
@@ -54,7 +54,7 @@ impl ServiceInfo {
                 reason: "Service name cannot be empty".to_string(),
             });
         }
-        
+
         // Validate port is not 0
         if port == 0 {
             return Err(crate::error::DiscoveryError::InvalidServiceInfo {
@@ -62,9 +62,9 @@ impl ServiceInfo {
                 reason: "Port cannot be zero".to_string(),
             });
         }
-        
+
         let service_type = ServiceType::new(service_type)?;
-        
+
         let mut info = Self {
             id: Uuid::new_v4(),
             name: name.to_string(),
@@ -284,7 +284,10 @@ impl ServiceEvent {
 
     /// Check if this is a positive event (new or updated service)
     pub fn is_positive(&self) -> bool {
-        matches!(self, Self::New(_) | Self::Updated(_) | Self::DiscoveryCompleted { .. })
+        matches!(
+            self,
+            Self::New(_) | Self::Updated(_) | Self::DiscoveryCompleted { .. }
+        )
     }
 
     /// Check if this is a negative event (removed service or failure)
@@ -319,7 +322,10 @@ impl fmt::Display for ServiceEvent {
                 f,
                 "Discovery completed: {services_found} services found in {duration:?}"
             ),
-            Self::DiscoveryFailed { error, service_types } => write!(
+            Self::DiscoveryFailed {
+                error,
+                service_types,
+            } => write!(
                 f,
                 "Discovery failed for {} service types: {}",
                 service_types.len(),
@@ -352,13 +358,8 @@ mod tests {
 
     #[test]
     fn test_service_expiry() -> Result<(), crate::error::DiscoveryError> {
-        let mut service = ServiceInfo::new(
-            "Test Service",
-            "_http._tcp",
-            8080,
-            None,
-        )?
-        .with_ttl(Duration::from_millis(1));
+        let mut service = ServiceInfo::new("Test Service", "_http._tcp", 8080, None)?
+            .with_ttl(Duration::from_millis(1));
 
         std::thread::sleep(Duration::from_millis(10));
         assert!(service.is_expired());

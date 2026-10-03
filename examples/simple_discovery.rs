@@ -1,15 +1,12 @@
 //! Simple discovery example
-//! 
+//!
 //! This is a minimal, beginner-friendly example demonstrating:
 //! - Basic service registration
 //! - Simple service discovery
 //! - Clean resource management
 
 use auto_discovery::{
-    config::DiscoveryConfig,
-    service::ServiceInfo,
-    types::ServiceType,
-    ServiceDiscovery,
+    ServiceDiscovery, config::DiscoveryConfig, service::ServiceInfo, types::ServiceType,
 };
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -40,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ("version", "1.0"),
             ("status", "running"),
             ("example", "simple"),
-        ])
+        ]),
     )?
     .with_address(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST));
 
@@ -62,8 +59,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         info!("📊 Found {} service(s):", discovered.len());
         for (i, svc) in discovered.iter().enumerate() {
-            info!("  {}. {} at {}:{}", i + 1, svc.name(), svc.address, svc.port);
-            
+            info!(
+                "  {}. {} at {}:{}",
+                i + 1,
+                svc.name(),
+                svc.address,
+                svc.port
+            );
+
             // Show attributes if present
             if !svc.attributes.is_empty() {
                 for (key, value) in &svc.attributes {

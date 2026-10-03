@@ -1,7 +1,7 @@
 //! Type definitions for the auto-discovery library
 
-use crate::service::ServiceInfo;
 use crate::error::{DiscoveryError, Result};
+use crate::service::ServiceInfo;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -27,7 +27,9 @@ impl ServiceType {
         let service_type_str = service.into();
 
         if service_type_str.is_empty() {
-            return Err(DiscoveryError::invalid_service("Service type cannot be empty"));
+            return Err(DiscoveryError::invalid_service(
+                "Service type cannot be empty",
+            ));
         }
 
         // Handle UPnP URN format (urn:schemas-upnp-org:service:ContentDirectory:1)
@@ -41,7 +43,7 @@ impl ServiceType {
 
         // Parse service type like "_http._tcp.local" or "_http._tcp"
         let parts: Vec<&str> = service_type_str.split('.').collect();
-        
+
         if parts.len() < 2 {
             return Err(DiscoveryError::invalid_service(
                 "Service type must contain protocol (e.g., '._tcp')",
@@ -50,7 +52,7 @@ impl ServiceType {
 
         // Extract service name (first part)
         let service_name = parts[0].to_string();
-        
+
         // Extract protocol (second part, should start with _)
         let protocol_part = parts[1];
         if !protocol_part.starts_with('_') {
@@ -59,7 +61,7 @@ impl ServiceType {
             ));
         }
         let protocol = format!(".{protocol_part}");
-        
+
         // Extract domain if present (third part and beyond)
         let domain = if parts.len() > 2 {
             Some(parts[2..].join("."))
@@ -82,7 +84,10 @@ impl ServiceType {
     }
 
     /// Create a new service type with specified protocol
-    pub fn with_protocol<S1: Into<String>, S2: Into<String>>(service: S1, protocol: S2) -> Result<Self> {
+    pub fn with_protocol<S1: Into<String>, S2: Into<String>>(
+        service: S1,
+        protocol: S2,
+    ) -> Result<Self> {
         let mut protocol_str = protocol.into();
         if &protocol_str[0..1] != "_" {
             protocol_str = format!("_{protocol_str}");
@@ -125,7 +130,7 @@ impl ServiceType {
         if self.service_name.starts_with("urn:") {
             return self.service_name.clone();
         }
-        
+
         match &self.domain {
             None => format!("{}_{}", self.service_name, self.protocol),
             Some(domain) => format!("{}_{}.{}", self.service_name, self.protocol, domain),
@@ -149,11 +154,7 @@ impl FromStr for ServiceType {
 impl fmt::Display for ServiceType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(domain) = &self.domain {
-            write!(
-                f,
-                "{}{}.{}",
-                self.service_name, self.protocol, domain
-            )
+            write!(f, "{}{}.{}", self.service_name, self.protocol, domain)
         } else {
             write!(f, "{}{}", self.service_name, self.protocol)
         }
@@ -288,14 +289,16 @@ impl DiscoveryFilter {
     /// Check if a service matches this filter
     pub fn matches(&self, service: &ServiceInfo) -> bool {
         // Check service type filters
-        if !self.service_type_filters.is_empty() 
-            && !self.service_type_filters.contains(&service.service_type) {
+        if !self.service_type_filters.is_empty()
+            && !self.service_type_filters.contains(&service.service_type)
+        {
             return false;
         }
 
         // Check protocol filters
-        if !self.protocol_filters.is_empty() 
-            && !self.protocol_filters.contains(&service.protocol_type) {
+        if !self.protocol_filters.is_empty()
+            && !self.protocol_filters.contains(&service.protocol_type)
+        {
             return false;
         }
 
@@ -355,12 +358,11 @@ mod tests {
         assert!(ServiceType::new("_http").is_err()); // Missing protocol
     }
 
-    #[test] 
+    #[test]
     fn test_discovery_filter() -> Result<()> {
         use crate::service::ServiceInfo;
-        
-        let filter = DiscoveryFilter::new()
-            .with_service_type(ServiceType::new("_http._tcp")?);
+
+        let filter = DiscoveryFilter::new().with_service_type(ServiceType::new("_http._tcp")?);
 
         let service = ServiceInfo::new(
             "Test Service",

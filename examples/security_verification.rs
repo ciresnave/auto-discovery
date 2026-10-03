@@ -1,13 +1,13 @@
 //! Example demonstrating service security verification features
-//! 
+//!
 //! This example shows how to use the security verification features
 //! to ensure discovered services are authentic and trustworthy.
 
 use auto_discovery::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
 use std::time::Duration;
 use tracing::{info, warn};
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ("security", "enabled"),
             ("tls", "1.3"),
             ("auth", "required"),
-        ])
+        ]),
     )?;
 
     info!("Registering secure service: {}", secure_service.name());
@@ -58,10 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Regular Web Server",
         "_http._tcp",
         8080,
-        Some(vec![
-            ("version", "1.0"),
-            ("security", "basic"),
-        ])
+        Some(vec![("version", "1.0"), ("security", "basic")]),
     )?;
 
     info!("Registering regular service: {}", regular_service.name());
@@ -77,12 +74,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Verify each discovered service
     for service in &services {
         info!("Verifying service: {}", service.name());
-        
+
         match discovery.verify_service(service).await {
             Ok(is_verified) => {
                 if is_verified {
-                    info!("✅ Service '{}' is verified and trustworthy", service.name());
-                    
+                    info!(
+                        "✅ Service '{}' is verified and trustworthy",
+                        service.name()
+                    );
+
                     // Check for security attributes
                     if let Some(security) = service.attributes.get("security") {
                         match security.as_str() {
@@ -129,7 +129,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             Err(e) => {
-                warn!("⚠️  Error during re-verification of '{}': {}", service.name(), e);
+                warn!(
+                    "⚠️  Error during re-verification of '{}': {}",
+                    service.name(),
+                    e
+                );
             }
         }
     }

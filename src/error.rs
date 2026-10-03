@@ -1,15 +1,9 @@
 //! Error types for the auto-discovery library
 
-use std::{
-    error::Error as StdError,
-    fmt,
-    io,
-    num::ParseIntError,
-    time::SystemTimeError,
-};
 use base64::DecodeError;
 #[cfg(feature = "secure")]
 use ring::error::{KeyRejected, Unspecified};
+use std::{error::Error as StdError, fmt, io, num::ParseIntError, time::SystemTimeError};
 
 /// The primary error type for the auto-discovery crate
 #[derive(Debug)]
@@ -19,11 +13,11 @@ pub enum DiscoveryError {
     /// Invalid service data error
     InvalidData(String),
     /// Invalid service info error
-    InvalidServiceInfo { 
+    InvalidServiceInfo {
         /// The field that contains invalid data
-        field: String, 
+        field: String,
         /// The reason why the field is invalid
-        reason: String 
+        reason: String,
     },
     /// Service not found error
     ServiceNotFound(String),

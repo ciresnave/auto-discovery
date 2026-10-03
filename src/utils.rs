@@ -88,7 +88,10 @@ pub mod network {
             .filter(|iface| iface.is_up && iface.supports_multicast)
             .collect();
 
-        debug!("Found {} multicast-capable interfaces", multicast_interfaces.len());
+        debug!(
+            "Found {} multicast-capable interfaces",
+            multicast_interfaces.len()
+        );
         Ok(multicast_interfaces)
     }
 
@@ -129,7 +132,7 @@ pub mod network {
     /// Get the local IP addresses for a given interface
     pub fn get_interface_addresses(interface_name: &str) -> Result<Vec<IpAddr>> {
         let interfaces = get_network_interfaces()?;
-        
+
         for interface in interfaces {
             if interface.name == interface_name {
                 return Ok(interface.all_addresses());
@@ -144,7 +147,7 @@ pub mod network {
     /// Check if a port is likely to be available for binding
     pub async fn is_port_available(port: u16) -> bool {
         use tokio::net::TcpListener;
-        
+
         (TcpListener::bind(("127.0.0.1", port)).await).is_ok()
     }
 
@@ -225,7 +228,9 @@ pub mod string {
     /// Validate a service type string
     pub fn validate_service_type(service_type: &str) -> Result<()> {
         if service_type.is_empty() {
-            return Err(DiscoveryError::invalid_service("Service type cannot be empty"));
+            return Err(DiscoveryError::invalid_service(
+                "Service type cannot be empty",
+            ));
         }
 
         if !service_type.starts_with('_') {
@@ -339,7 +344,7 @@ mod tests {
         assert!(result.is_ok());
         let interfaces = result.unwrap();
         assert!(!interfaces.is_empty());
-        
+
         // Should always have at least loopback
         assert!(interfaces.iter().any(|i| i.name == "lo"));
     }
@@ -357,23 +362,32 @@ mod tests {
     fn test_current_timestamp() {
         let timestamp = time::current_timestamp();
         assert!(timestamp > 0);
-        
+
         let timestamp_millis = time::current_timestamp_millis();
         assert!(timestamp_millis > timestamp * 1000);
     }
 
     #[test]
     fn test_duration_to_string() {
-        assert_eq!(time::duration_to_string(Duration::from_millis(500)), "500ms");
+        assert_eq!(
+            time::duration_to_string(Duration::from_millis(500)),
+            "500ms"
+        );
         assert_eq!(time::duration_to_string(Duration::from_secs(5)), "5.000s");
         assert_eq!(time::duration_to_string(Duration::from_secs(65)), "1m 5s");
-        assert_eq!(time::duration_to_string(Duration::from_secs(3665)), "1h 1m 5s");
+        assert_eq!(
+            time::duration_to_string(Duration::from_secs(3665)),
+            "1h 1m 5s"
+        );
     }
 
     #[test]
     fn test_sanitize_service_name() {
         assert_eq!(string::sanitize_service_name("My Service!"), "My_Service_");
-        assert_eq!(string::sanitize_service_name("test-service_1.0"), "test-service_1.0");
+        assert_eq!(
+            string::sanitize_service_name("test-service_1.0"),
+            "test-service_1.0"
+        );
     }
 
     #[test]
@@ -389,7 +403,7 @@ mod tests {
     fn test_parse_txt_record() {
         let txt = "version=1.0;protocol=HTTP;enabled";
         let attrs = string::parse_txt_record(txt);
-        
+
         assert_eq!(attrs.get("version"), Some(&"1.0".to_string()));
         assert_eq!(attrs.get("protocol"), Some(&"HTTP".to_string()));
         assert_eq!(attrs.get("enabled"), Some(&"".to_string()));
@@ -400,7 +414,7 @@ mod tests {
         let mut attrs = std::collections::HashMap::new();
         attrs.insert("version".to_string(), "1.0".to_string());
         attrs.insert("enabled".to_string(), "".to_string());
-        
+
         let txt = string::format_txt_record(&attrs);
         assert!(txt.contains("version=1.0"));
         assert!(txt.contains("enabled"));

@@ -7,10 +7,7 @@ use crate::{
     service::ServiceInfo,
     types::ProtocolType,
 };
-use std::{
-    collections::HashMap,
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 
@@ -24,18 +21,18 @@ pub struct ServiceDiscovery {
 
 impl ServiceDiscovery {
     /// Create a new service discovery instance with the given configuration
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `config` - The discovery configuration to use
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the configuration is invalid or if protocol initialization fails
     pub async fn new(config: DiscoveryConfig) -> Result<Self> {
         // Validate configuration before proceeding
         config.validate()?;
-        
+
         let protocol_manager = ProtocolManager::new(config.clone()).await?;
 
         Ok(Self {
@@ -47,23 +44,36 @@ impl ServiceDiscovery {
     }
 
     /// Discover services with optional protocol type filter
-    pub async fn discover_services(&self, protocol_type: Option<ProtocolType>) -> Result<Vec<ServiceInfo>> {
+    pub async fn discover_services(
+        &self,
+        protocol_type: Option<ProtocolType>,
+    ) -> Result<Vec<ServiceInfo>> {
         debug!("Starting service discovery");
-        
+
         let service_types = self.config.service_types().to_vec();
         if service_types.is_empty() {
-            return Err(DiscoveryError::configuration("No service types configured for discovery"));
+            return Err(DiscoveryError::configuration(
+                "No service types configured for discovery",
+            ));
         }
 
         let timeout = Some(self.config.protocol_timeout());
         let mut services = match protocol_type {
             Some(protocol) => {
                 if !self.config.is_protocol_enabled(protocol) {
-                    return Err(DiscoveryError::protocol(format!("Protocol {protocol:?} is not enabled")));
+                    return Err(DiscoveryError::protocol(format!(
+                        "Protocol {protocol:?} is not enabled"
+                    )));
                 }
-                self.protocol_manager.discover_services_with_protocol(protocol, service_types, timeout).await?
+                self.protocol_manager
+                    .discover_services_with_protocol(protocol, service_types, timeout)
+                    .await?
             }
-            None => self.protocol_manager.discover_services(service_types, timeout).await?,
+            None => {
+                self.protocol_manager
+                    .discover_services(service_types, timeout)
+                    .await?
+            }
         };
 
         // Apply service filtering
@@ -89,21 +99,21 @@ impl ServiceDiscovery {
     }
 
     /// Discover services with filtering by service types
-    /// 
+    ///
     /// This provides more granular control over service discovery than the basic
     /// `discover_services` method.
-    /// 
+    ///
     /// # Arguments
-    /// 
-    /// * `service_types` - Optional list of specific service types to discover. 
+    ///
+    /// * `service_types` - Optional list of specific service types to discover.
     ///   If None, uses all configured service types.
     /// * `protocol_type` - Optional protocol filter. If None, uses all enabled protocols.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```rust
     /// use auto_discovery::{ServiceDiscovery, types::{ServiceType, ProtocolType}};
-    /// 
+    ///
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let discovery = ServiceDiscovery::new(auto_discovery::config::DiscoveryConfig::new()).await?;
@@ -112,39 +122,50 @@ impl ServiceDiscovery {
     ///     Some(vec![ServiceType::new("_http._tcp")?]),
     ///     Some(ProtocolType::Mdns)
     /// ).await?;
-    /// 
+    ///
     /// // Discover HTTP services using any protocol
     /// let all_services = discovery.discover_services_filtered(
-    ///     Some(vec![ServiceType::new("_http._tcp")?]), 
+    ///     Some(vec![ServiceType::new("_http._tcp")?]),
     ///     None
     /// ).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn discover_services_filtered(&self, 
-        service_types: Option<Vec<crate::types::ServiceType>>, 
-        protocol_type: Option<ProtocolType>
+    pub async fn discover_services_filtered(
+        &self,
+        service_types: Option<Vec<crate::types::ServiceType>>,
+        protocol_type: Option<ProtocolType>,
     ) -> Result<Vec<ServiceInfo>> {
         debug!("Starting filtered service discovery");
-        
+
         let target_service_types = match service_types {
             Some(types) => types,
-            None => self.config.service_types().to_vec()
+            None => self.config.service_types().to_vec(),
         };
 
         if target_service_types.is_empty() {
-            return Err(DiscoveryError::configuration("No service types specified for discovery"));
+            return Err(DiscoveryError::configuration(
+                "No service types specified for discovery",
+            ));
         }
 
         let timeout = Some(self.config.protocol_timeout());
         let mut services = match protocol_type {
             Some(protocol) => {
                 if !self.config.is_protocol_enabled(protocol) {
-                    return Err(DiscoveryError::protocol(format!("Protocol {protocol:?} is not enabled")));
+                    return Err(DiscoveryError::protocol(format!(
+                        "Protocol {protocol:?} is not enabled"
+                    )));
                 }
-                self.protocol_manager.discover_services_with_protocol(protocol, target_service_types, timeout).await?
+                self.protocol_manager
+                    .discover_services_with_protocol(protocol, target_service_types, timeout)
+                    .await?
             }
-            None => self.protocol_manager.discover_services(target_service_types, timeout).await?,
+            None => {
+                self.protocol_manager
+                    .discover_services(target_service_types, timeout)
+                    .await?
+            }
         };
 
         // Apply service filtering
@@ -169,7 +190,9 @@ impl ServiceDiscovery {
         let service_name = service.name().to_string();
         debug!("Registering service: {}", service_name);
 
-        self.protocol_manager.register_service(service.clone()).await?;
+        self.protocol_manager
+            .register_service(service.clone())
+            .await?;
 
         let mut registered = self.registered_services.lock().await;
         registered.insert(service_name.clone(), service);
@@ -201,7 +224,9 @@ impl ServiceDiscovery {
 
     /// Get all discovered services
     pub async fn get_discovered_services(&self) -> Vec<ServiceInfo> {
-        self.discovered_services.lock().await
+        self.discovered_services
+            .lock()
+            .await
             .values()
             .cloned()
             .collect()
@@ -209,7 +234,9 @@ impl ServiceDiscovery {
 
     /// Get all registered services
     pub async fn get_registered_services(&self) -> Vec<ServiceInfo> {
-        self.registered_services.lock().await
+        self.registered_services
+            .lock()
+            .await
             .values()
             .cloned()
             .collect()
@@ -217,8 +244,15 @@ impl ServiceDiscovery {
 
     /// Check if a service exists
     pub async fn service_exists(&self, service_name: &str) -> bool {
-        self.discovered_services.lock().await.contains_key(service_name) ||
-        self.registered_services.lock().await.contains_key(service_name)
+        self.discovered_services
+            .lock()
+            .await
+            .contains_key(service_name)
+            || self
+                .registered_services
+                .lock()
+                .await
+                .contains_key(service_name)
     }
 
     /// Update discovery configuration
@@ -228,8 +262,6 @@ impl ServiceDiscovery {
         Ok(())
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -254,7 +286,7 @@ mod tests {
 
         let service = ServiceInfo::new("Test Service", "_test._tcp", 8080, None).unwrap();
         let result = discovery.register_service(service).await;
-        
+
         // Registration might fail due to missing protocol implementation
         // This is expected in unit tests
         match result {
