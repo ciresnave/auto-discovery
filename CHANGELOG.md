@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - Unreleased
+
+Bug fixes and dependency updates. Non-breaking for code that was correct; see the `name` note under Fixed.
+
+### Changed: dependencies brought current
+
+- **`mdns-sd` 0.13 → 0.21.** Since 0.21, `ServiceEvent::ServiceResolved`
+  carries a `ResolvedService` (public fields) instead of a `ServiceInfo`; the
+  converter is ported to it. **`From<mdns_sd::Error>` now refers to 0.21's error
+  type.**
+- **`base64` 0.22 → 0.23.** Only `Engine`, `STANDARD` and `DecodeError` are
+  used, and their behaviour is unchanged.
+- **`criterion` 0.6 → 0.8** (dev): the benches build with no warnings.
+- **`rand` removed** from both dependencies and dev-dependencies: it was never
+  used. The one `rand::` path in the code is `ring::rand::SystemRandom`.
+- The declared minimums of the in-range dependencies are raised to their
+  current versions.
+
+### Fixed: mDNS discovery results (visible now that resolution works)
+
+- **A discovered service's `name` is its instance name**, e.g. `my-svc` from
+  `my-svc._http._tcp.local.`. It used to be the **hostname**
+  (`my-host.local.`). That was a pre-existing bug: no `ServiceResolved` event
+  reached the converter in the tests until mdns-sd 0.21.
+- **Results no longer contain duplicates.** `discover_services` merges services
+  found on the network with locally registered ones. It de-duplicated by `id`,
+  but a network copy gets a fresh UUID, so the check never matched it and each
+  service was returned twice. It now compares instance identity: name, type
+  (up to a trailing `.local.`) and port. Repeated `ServiceResolved` events for
+  one instance are collapsed the same way.
+- **Test isolation:** each mDNS test now uses its own service type. With real
+  resolution working, concurrently running tests that shared `_test._tcp`
+  discovered each other's services.
+
 ## [0.3.0] - Unreleased
 
 **Breaking.** Every advisory is cleared: OSV reports **0 hits** over the locked
@@ -52,36 +86,6 @@ what its documentation says it is.
   `protocols/{basic_mdns,libmdns,mdns_alt,simple_mdns,zeroconf}`. **The 0.2.0
   entry below claimed several of these as shipped features; it is corrected in
   place.**
-
-### Changed: dependencies brought current
-
-- **`mdns-sd` 0.13 → 0.21.** Since 0.21, `ServiceEvent::ServiceResolved`
-  carries a `ResolvedService` (public fields) instead of a `ServiceInfo`; the
-  converter is ported to it. **`From<mdns_sd::Error>` now refers to 0.21's error
-  type.**
-- **`base64` 0.22 → 0.23.** Only `Engine`, `STANDARD` and `DecodeError` are
-  used, and their behaviour is unchanged.
-- **`criterion` 0.6 → 0.8** (dev): the benches build with no warnings.
-- **`rand` removed** from both dependencies and dev-dependencies: it was never
-  used. The one `rand::` path in the code is `ring::rand::SystemRandom`.
-- The declared minimums of the in-range dependencies are raised to their
-  current versions.
-
-### Fixed: mDNS discovery results (visible now that resolution works)
-
-- **A discovered service's `name` is its instance name**, e.g. `my-svc` from
-  `my-svc._http._tcp.local.`. It used to be the **hostname**
-  (`my-host.local.`). That was a pre-existing bug: no `ServiceResolved` event
-  reached the converter in the tests until mdns-sd 0.21.
-- **Results no longer contain duplicates.** `discover_services` merges services
-  found on the network with locally registered ones. It de-duplicated by `id`,
-  but a network copy gets a fresh UUID, so the check never matched it and each
-  service was returned twice. It now compares instance identity: name, type
-  (up to a trailing `.local.`) and port. Repeated `ServiceResolved` events for
-  one instance are collapsed the same way.
-- **Test isolation:** each mDNS test now uses its own service type. With real
-  resolution working, concurrently running tests that shared `_test._tcp`
-  discovered each other's services.
 
 ### Fixed
 
