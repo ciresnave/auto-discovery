@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.3] - Unreleased
+
+### Changed (CI only)
+
+- **Codecov upload uses `codecov/codecov-action@v5`** (was v3). With the
+  same `CODECOV_TOKEN`, the v3 uploader got `404 Repository not found` while
+  v5 uploads succeed in another repo. The token and `fail_ci_if_error` are
+  unchanged.
+
 ## [0.3.2] - Unreleased
 
 ### Added

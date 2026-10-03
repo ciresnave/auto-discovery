@@ -1,6 +1,6 @@
 [package]
 name = "auto-discovery"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 # Highest rust-version among locked dependencies (uuid 1.27); CI `msrv` job.
 rust-version = "1.89"
