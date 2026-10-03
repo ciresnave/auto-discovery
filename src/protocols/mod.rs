@@ -223,6 +223,10 @@ mod tests {
     use crate::config::DiscoveryConfig;
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_protocol_manager_creation() {
         let config = DiscoveryConfig::new();
         let manager = ProtocolManager::new(config).await;
@@ -239,6 +243,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_protocol_availability() {
         let config = DiscoveryConfig::new().with_protocol(ProtocolType::Mdns);
         if let Ok(manager) = ProtocolManager::new(config).await {
@@ -248,6 +256,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_service_registration() {
         let config = DiscoveryConfig::new().with_protocol(ProtocolType::Mdns);
         let manager = ProtocolManager::new(config).await.unwrap();

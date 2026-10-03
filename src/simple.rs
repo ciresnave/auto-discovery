@@ -27,7 +27,7 @@ impl SimpleDiscovery {
     /// - Service verification enabled
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use auto_discovery::simple::SimpleDiscovery;
     ///
     /// #[tokio::main]
@@ -65,7 +65,7 @@ impl SimpleDiscovery {
     /// Register a simple HTTP service
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// # use auto_discovery::simple::SimpleDiscovery;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -107,7 +107,7 @@ impl SimpleDiscovery {
 /// Discover all HTTP services on the network
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use auto_discovery::simple::discover_http_services;
 ///
 /// #[tokio::main]
@@ -127,7 +127,7 @@ pub async fn discover_http_services() -> Result<Vec<ServiceInfo>> {
 /// Register an HTTP service and return a handle for cleanup
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use auto_discovery::simple::register_http_service;
 ///
 /// #[tokio::main]
@@ -173,6 +173,10 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_simple_discovery() {
         let discovery = SimpleDiscovery::new().await.unwrap();
 
@@ -183,6 +187,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_register_http_service() {
         let discovery = SimpleDiscovery::new().await.unwrap();
         let result = discovery.register_http_service("Test Service", 8080).await;
@@ -199,6 +207,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_one_liner_functions() {
         // Test the one-liner function
         let result = discover_http_services().await;

@@ -111,7 +111,7 @@ impl ServiceDiscovery {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// use auto_discovery::{ServiceDiscovery, types::{ServiceType, ProtocolType}};
     ///
     /// # #[tokio::main]
@@ -270,6 +270,10 @@ mod tests {
     use std::time::Duration;
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_service_discovery_creation() {
         let config = DiscoveryConfig::new()
             .with_service_type(ServiceType::new("_test._tcp").unwrap())
@@ -280,6 +284,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_service_registration() {
         let config = DiscoveryConfig::new();
         let discovery = ServiceDiscovery::new(config).await.unwrap();
@@ -300,6 +308,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_event_subscription() {
         let config = DiscoveryConfig::new();
         let discovery = ServiceDiscovery::new(config).await.unwrap();
@@ -310,6 +322,10 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(
+        not(feature = "network-tests"),
+        ignore = "binds network sockets; enable with --features network-tests"
+    )]
     async fn test_config_validation() {
         let invalid_config = DiscoveryConfig::new().with_timeout(Duration::ZERO);
         let discovery = ServiceDiscovery::new(invalid_config).await;

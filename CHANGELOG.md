@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - Unreleased
+
+### Added
+
+- **`rust-version = "1.89"`** is now declared. It's the highest `rust-version`
+  among the locked dependencies (`uuid` 1.27); the crate's own code needs 1.88
+  for let-chains. A CI `msrv` job builds on 1.89. Some dependencies declare no
+  `rust-version`, so that job, not the metadata, is the proof.
+- **Test-only `network-tests` feature.** A plain `cargo test` no longer opens
+  any mDNS/SSDP sockets. Each rebuilt test binary is a new program to the OS
+  firewall, so every rebuild raised a fresh prompt.
+  - The 14 lib tests in `discovery`, `protocols::*` and `simple` that build a
+    discovery stack are `#[ignore]`d without the feature.
+  - `tests/mdns_tests.rs` and `tests/upnp_tests.rs` aren't built without it
+    (`required-features`).
+  - The five doctests that construct a discovery stack are now `no_run`: they
+    still compile but no longer execute.
+  - CI enables the feature through `--all-features`. On a LAN, run the
+    multicast tests with `cargo test --features network-tests -- --ignored`.
+
+### Changed (CI only)
+
+- **Every CI job has a fixed name**, so branch protection can require them:
+  `fmt`, `clippy` (default, all and no features), `unit (linux, all
+  features)`, `unit (windows, default features)`, `unit (macos, default
+  features)`, `network (linux, all features)`, `no default features`,
+  `msrv (1.89)`, `Security Audit`, `Benchmark`, `Code Coverage`.
+- **Network tests are split from unit tests.**
+  - The unit jobs run library tests that never touch the network.
+  - The network job runs the rest: lib modules `discovery::tests`,
+    `protocols::*` and `simple::tests`, the integration tests in `tests/`, and
+    the doctests.
+  - The two sets partition all 47 library tests exactly (31 + 16, no
+    overlap).
+- Every step uses `--locked`. The Codecov upload passes `CODECOV_TOKEN` once
+  that secret exists.
+
 ## [0.3.1] - Unreleased
 
 Bug fixes and dependency updates. Non-breaking for code that was correct; see the `name` note under Fixed.
