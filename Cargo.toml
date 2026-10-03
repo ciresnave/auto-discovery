@@ -1,6 +1,6 @@
 [package]
 name = "auto-discovery"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 authors = ["Eric Evans <ciresnave@gmail.com>"]
 description = "A general-purpose network and system service discovery library for Rust applications"

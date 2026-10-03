@@ -8,106 +8,20 @@ A production-grade network and system service discovery library for Rust applica
 
 ## Features
 
-- 🔍 **Zero-configuration network service discovery**
-- 🌐 **Production-grade protocol implementations** (mDNS, DNS-SD, UPnP/SSDP)
-- 🛡️ **Comprehensive safety features**
-  - Rate limiting
-  - Automatic retries
-  - Circuit breakers
-  - Timeouts
-  - Health monitoring
-- ⚖️ **Smart load balancing**
-  - Multiple strategies (Round Robin, Least Loaded, Random)
-  - Response time monitoring
-  - Automatic failover
-- 📊 **Metrics and monitoring**
-  - Prometheus integration
-  - Health status tracking
-  - Performance metrics
-  - Request tracing
-- 🔌 **Protocol manager with selective protocol enabling**
-- 💻 **Cross-platform implementation** (Windows, Linux, macOS)
-- ⚡ **Asynchronous API** with tokio support
-- 🔒 **Secure service verification** with cryptographic signatures
+- 🔍 **Network service discovery**: mDNS (via `mdns-sd`) and UPnP/SSDP
+- 🔌 **Protocol manager** with selective protocol enabling, one Cargo feature
+  per backend (`mdns-sd`, `upnp`, `dns-sd`)
+- 💻 **Cross-platform** (Windows, Linux, macOS)
+- ⚡ **Asynchronous API** on tokio
+- 🔒 **Service verification** with cryptographic signatures (`secure` feature)
 
-## Production Safety Features
-
-### Rate Limiting and Retry
-
-```rust
-use auto_discovery::safety::{SafetyConfig, SafetyManager};
-
-// Configure safety features
-let safety_config = SafetyConfig {
-    rate_limit_per_second: 10,
-    retry_max_attempts: 3,
-    retry_initial_interval: Duration::from_millis(100),
-    health_check_interval: Duration::from_secs(1),
-    operation_timeout: Duration::from_secs(5),
-};
-
-let safety_manager = SafetyManager::new(safety_config);
-
-// Use with automatic retry
-let result = safety_manager.with_retry(|| Box::pin(async {
-    manager.register_service(service.clone()).await
-})).await?;
-
-// Rate limit check
-safety_manager.check_rate_limit(&service_type).await?;
-```
-
-### Load Balancing
-
-```rust
-use auto_discovery::safety::{LoadBalancer, LoadBalancerConfig, LoadBalancingStrategy};
-
-// Configure load balancer
-let lb_config = LoadBalancerConfig {
-    strategy: LoadBalancingStrategy::LeastLoaded,
-    decay_time: Duration::from_secs(10),
-    rtt_threshold: Duration::from_millis(100),
-};
-
-let balancer = LoadBalancer::new(lb_config);
-
-// Add services to load balancer
-balancer.update_service(service.clone(), 0.0).await?;
-
-// Select optimal service
-let selected = balancer.select_service()
-    .expect("Should have services available");
-
-// Record metrics
-balancer.record_request(
-    &selected.id(),
-    Duration::from_millis(50),
-    true
-);
-```
-
-### Health Monitoring
-
-```rust
-use auto_discovery::safety::{HealthMonitor, ServiceStatus};
-
-let health_monitor = HealthMonitor::new();
-
-// Update service health
-health_monitor.update_service(&service, is_healthy);
-
-// Check service status
-if let Some(status) = health_monitor.get_service_status(&service.id()) {
-    match status {
-        ServiceStatus::Healthy => println!("Service is healthy"),
-        ServiceStatus::Degraded => println!("Service is degraded"),
-        ServiceStatus::Unhealthy => println!("Service is unhealthy"),
-    }
-}
-
-// Clean up stale entries
-health_monitor.cleanup_stale(Duration::from_secs(300));
-```
+> **Not yet implemented:** DNS-SD. The `dns-sd` feature compiles a stub, and
+> `DnsSdProtocol::new` returns an error.
+>
+> Earlier releases of this README advertised rate limiting, retries, circuit
+> breakers, health monitoring, load balancing and Prometheus metrics. **None of
+> that code was ever part of the built crate**: it lived in source files no
+> module declared. Those files were removed in 0.3.0.
 
 ## Quick Start
 
@@ -115,7 +29,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-auto-discovery = "0.1.0"
+auto-discovery = "0.3"
 tokio = { version = "1.0", features = ["full"] }
 ```
 
@@ -236,10 +150,8 @@ The library currently supports the following protocols:
   - Device description parsing
   - Service verification
 
-- **DNS-SD**: DNS Service Discovery (in development)
-  - Service registration
-  - Wide-area discovery
-  - TXT record support
+- **DNS-SD**: DNS Service Discovery: **not yet implemented**
+  (`DnsSdProtocol::new` returns an error)
 
 ## Testing
 

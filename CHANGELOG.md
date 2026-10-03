@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - Unreleased
+
+**Breaking.** Every advisory is cleared: OSV reports **0 hits** over the locked
+dependency graph, down from 50 across 22 crates at 0.2.0. The crate is also now
+what its documentation says it is.
+
+### Security
+
+- **trust-dns removed, not migrated.** Its only use was as the *type* of a dead
+  private field (`DnsSdProtocol::client`). That struct is never constructed:
+  its only constructor always returns an error. Removing the field and the
+  dependency clears RUSTSEC-2025-0017 (trust-dns, renamed to hickory-dns) and
+  RUSTSEC-2024-0421 (`idna` 0.4), with no new dependency. **DNS-SD remains
+  unimplemented.** The `dns-sd` feature compiles a stub, whose constructor
+  returns `DiscoveryError::Protocol("DNS-SD protocol not yet implemented")`.
+- **`quick-xml` removed**, which clears RUSTSEC-2026-0194 and 0195. It was never
+  imported.
+- **Unmaintained crates removed:** `backoff` and `instant`, plus `async-std`,
+  `net2` and `proc-macro-error`, which arrived through the external `mdns` 3.0
+  crate. That crate was never used; the `mdns` module uses mdns-sd.
+
+### Removed (breaking)
+
+- **Features `mdns`, `simple-mdns`, `basic-mdns`, `metrics` and `testing`.**
+  They enabled only dependencies that nothing compiled used, or a backend that
+  never built. `secure` now enables only `ring`, and `upnp` enables no
+  dependencies.
+- **31 dependencies removed** (counted by diffing `Cargo.toml` against
+  0.2.1). Each was found by a census of the crate, its tests, examples and
+  benches, then confirmed by removal and build:
+  - **26 normal:** `backoff`, `bytes`, `flume`, `futures`, `hex`, `hyper`,
+    `mdns`, `metrics`, `metrics-exporter-prometheus`, `native-tls`,
+    `quick-xml`, `reqwest`, `simple-mdns`, `socket2`, `tempfile`, `thiserror`,
+    `tokio-metrics`, `tokio-stream`, `tokio-util`, `tower`, `tower-http`,
+    `trust-dns-client` (see Security), `trust-dns-proto`,
+    `trust-dns-resolver`, `url`, `x509-parser`;
+  - **5 dev:** `mockall`, `proptest`, `tempfile`, `test-log`, `tokio-test`.
+
+  None were added.
+
+  The locked graph went from 399 packages to 158.
+- **12 source files that were never compiled**, because no module declared
+  them: `health`, `metrics`, `safety` (and `safety/load_balancer`), `shutdown`,
+  `testing/stress`, `security/tsig`, and
+  `protocols/{basic_mdns,libmdns,mdns_alt,simple_mdns,zeroconf}`. **The 0.2.0
+  entry below claimed several of these as shipped features; it is corrected in
+  place.**
+
+### Fixed
+
+- **`--no-default-features` now builds.** Each protocol module, its protocol
+  manager initializer and the `mdns_sd` error conversion are gated on their
+  feature (`dns-sd`, `mdns-sd`, `upnp`). Default, `--all-features`,
+  `--no-default-features` and each backend alone all build, and `clippy
+  --all-targets -D warnings` is clean in all of them.
+- **The README and `docs/performance.md`** no longer document APIs from the
+  never-compiled files (`safety`, `metrics`, `health`).
+
 ## [0.2.1] - Unreleased
 
 Non-breaking. This release makes CI able to pass, and picks up patched versions
@@ -51,18 +109,18 @@ of transitive dependencies.
 
 - **Simple API Module** (`src/simple.rs`) - One-liner functions for easy usage
 - **Service Registry** (`src/registry.rs`) - Centralized service management and discovery
-- **Health Monitoring** (`src/health.rs`) - Comprehensive health checks and status tracking
-- **Metrics Collection** (`src/metrics.rs`) - Performance monitoring and Prometheus integration
-- **Load Balancing** (`src/safety/load_balancer.rs`) - Smart service selection strategies
-- **Graceful Shutdown** (`src/shutdown.rs`) - Clean termination handling
+- ~~**Health Monitoring** (`src/health.rs`)~~ **Never shipped:** no module declared it, so it was never part of the built crate. Removed in 0.3.0.
+- ~~**Metrics Collection** (`src/metrics.rs`)~~ **Never shipped:** no module declared it, so it was never part of the built crate. Removed in 0.3.0.
+- ~~**Load Balancing** (`src/safety/load_balancer.rs`)~~ **Never shipped:** no module declared it, so it was never part of the built crate. Removed in 0.3.0.
+- ~~**Graceful Shutdown** (`src/shutdown.rs`)~~ **Never shipped:** no module declared it, so it was never part of the built crate. Removed in 0.3.0.
 - **Real UPnP/SSDP Implementation** - Working multicast discovery with actual network protocols
-- **Multiple mDNS Backends** - Alternative implementations for different use cases
+- ~~**Multiple mDNS Backends**~~ **Only the mdns-sd backend ever built.** The `simple-mdns` backend did not compile, and the others were undeclared files. Removed in 0.3.0.
 - **11 Working Examples** - Comprehensive usage demonstrations
 - **62 Total Tests** - Extensive test coverage including real network tests
 
 ### Enhanced
 
-- **Production Safety Features** - Rate limiting, circuit breakers, retry mechanisms
+- ~~**Production Safety Features**~~ **Never shipped:** the rate-limiting, circuit-breaker and retry code lived in `src/safety.rs`, which no module declared it, so it was never part of the built crate. Removed in 0.3.0.
 - **Security Features** - Feature-gated security with TLS/native-TLS support
 - **Error Handling** - Improved error context and protocol-specific error types
 - **Documentation** - Production-ready guides and API documentation
@@ -71,9 +129,9 @@ of transitive dependencies.
 ### Fixed
 
 - **Windows Build Compatibility** - Replaced rustls with native-tls for broader compatibility
-- **Feature Gates** - Proper conditional compilation for optional features
+- ~~**Feature Gates**~~ **Not true at 0.2.0:** `--features simple-mdns` and `--no-default-features` did not compile. Fixed in 0.2.1 and 0.3.0.
 - **Dependencies** - Updated to latest versions with security fixes
-- **Clippy Warnings** - Zero warnings, clean code quality
+- ~~**Clippy Warnings**~~ **Not true at 0.2.0:** `clippy -D warnings` reported 6 errors. Fixed in 0.2.1.
 
 ## [0.1.0] - 2024-01-15
 
