@@ -3,10 +3,10 @@
 use crate::{
     config::DiscoveryConfig,
     error::Result,
+    protocols::DiscoveryProtocol,
     registry::ServiceRegistry,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    protocols::DiscoveryProtocol,
+    types::{ProtocolType, ServiceType},
 };
 use async_trait::async_trait;
 use std::{
@@ -17,7 +17,7 @@ use std::{
 };
 use tokio::{
     net::UdpSocket,
-    sync::{oneshot, RwLock},
+    sync::{RwLock, oneshot},
     task::JoinHandle,
 };
 use tracing::{debug, error, info};
@@ -79,11 +79,14 @@ impl SsdpProtocol {
     ) -> Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:1900").await?;
         socket.set_broadcast(true)?;
-        
-        socket.join_multicast_v4("239.255.255.250".parse().unwrap(), "0.0.0.0".parse().unwrap())?;
-        
+
+        socket.join_multicast_v4(
+            "239.255.255.250".parse().unwrap(),
+            "0.0.0.0".parse().unwrap(),
+        )?;
+
         let mut buf = [0u8; 1024];
-        
+
         loop {
             tokio::select! {
                 _ = &mut shutdown_rx => break,
@@ -107,7 +110,7 @@ impl SsdpProtocol {
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -127,14 +130,18 @@ impl SsdpProtocol {
             "ssdp:all" | "upnp:rootdevice" => true,
             target => {
                 // Check if the search target matches the service type
-                target == service.service_type.to_string() || 
-                service.service_type.to_string().contains(target)
+                target == service.service_type.to_string()
+                    || service.service_type.to_string().contains(target)
             }
         }
     }
 
     /// Send a response to an M-SEARCH request
-    async fn send_response(socket: &UdpSocket, addr: SocketAddr, service: &ServiceInfo) -> Result<()> {
+    async fn send_response(
+        socket: &UdpSocket,
+        addr: SocketAddr,
+        service: &ServiceInfo,
+    ) -> Result<()> {
         let response = format!(
             "HTTP/1.1 200 OK\r\n\
             CACHE-CONTROL: max-age=1800\r\n\
@@ -150,7 +157,7 @@ impl SsdpProtocol {
             service.port,
             service.id
         );
-        
+
         socket.send_to(response.as_bytes(), addr).await?;
         Ok(())
     }
@@ -159,7 +166,7 @@ impl SsdpProtocol {
     async fn send_search_request(service_type: &str, timeout_secs: u64) -> Result<UdpSocket> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
-        
+
         let search_msg = format!(
             "M-SEARCH * HTTP/1.1\r\n\
             HOST: 239.255.255.250:1900\r\n\
@@ -168,10 +175,12 @@ impl SsdpProtocol {
             MX: {timeout_secs}\r\n\
             \r\n"
         );
-        
+
         let multicast_addr: SocketAddr = "239.255.255.250:1900".parse().unwrap();
-        socket.send_to(search_msg.as_bytes(), multicast_addr).await?;
-        
+        socket
+            .send_to(search_msg.as_bytes(), multicast_addr)
+            .await?;
+
         Ok(socket)
     }
 
@@ -179,7 +188,7 @@ impl SsdpProtocol {
     async fn send_announcement(service: &ServiceInfo, notification_type: &str) -> Result<()> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
         socket.set_broadcast(true)?;
-        
+
         let announcement = format!(
             "NOTIFY * HTTP/1.1\r\n\
             HOST: 239.255.255.250:1900\r\n\
@@ -190,15 +199,14 @@ impl SsdpProtocol {
             USN: uuid:{}::upnp:rootdevice\r\n\
             SERVER: AutoDiscovery/1.0 UPnP/1.0\r\n\
             \r\n",
-            service.address,
-            service.port,
-            notification_type,
-            service.id
+            service.address, service.port, notification_type, service.id
         );
-        
+
         let multicast_addr: SocketAddr = "239.255.255.250:1900".parse().unwrap();
-        socket.send_to(announcement.as_bytes(), multicast_addr).await?;
-        
+        socket
+            .send_to(announcement.as_bytes(), multicast_addr)
+            .await?;
+
         Ok(())
     }
 
@@ -206,7 +214,7 @@ impl SsdpProtocol {
     fn parse_service_from_response(response: &str, addr: SocketAddr) -> Option<ServiceInfo> {
         let mut location = None;
         let mut usn = None;
-        
+
         for line in response.lines() {
             if let Some(stripped) = line.strip_prefix("LOCATION:") {
                 location = Some(stripped.trim().to_string());
@@ -214,21 +222,19 @@ impl SsdpProtocol {
                 usn = Some(stripped.trim().to_string());
             }
         }
-        
+
         if let (Some(location), Some(usn)) = (location, usn) {
             let service_id = usn.split("::").next().unwrap_or("unknown").to_string();
             let mut service = ServiceInfo::new(
                 service_id,
                 "upnp._tcp",
                 addr.port(),
-                Some(vec![
-                    ("location", &location),
-                    ("usn", &usn),
-                ])
-            ).ok()?;
-            
+                Some(vec![("location", &location), ("usn", &usn)]),
+            )
+            .ok()?;
+
             service.address = addr.ip();
-            
+
             Some(service)
         } else {
             None
@@ -249,14 +255,21 @@ impl DiscoveryProtocol for SsdpProtocol {
         timeout: Option<Duration>,
     ) -> Result<Vec<ServiceInfo>> {
         let mut services = Vec::new();
-        let timeout_duration = timeout.unwrap_or(Duration::from_secs(10)).min(Duration::from_secs(30));
+        let timeout_duration = timeout
+            .unwrap_or(Duration::from_secs(10))
+            .min(Duration::from_secs(30));
         let start_time = Instant::now();
 
-        debug!("Starting UPnP discovery for service types: {:?}", service_types);
+        debug!(
+            "Starting UPnP discovery for service types: {:?}",
+            service_types
+        );
 
         // Send search request for each service type
         for service_type in service_types {
-            let socket = Self::send_search_request(&service_type.to_string(), timeout_duration.as_secs()).await?;
+            let socket =
+                Self::send_search_request(&service_type.to_string(), timeout_duration.as_secs())
+                    .await?;
 
             let mut buf = [0u8; 2048];
             while start_time.elapsed() < timeout_duration {
@@ -291,19 +304,25 @@ impl DiscoveryProtocol for SsdpProtocol {
         // Send announcement
         Self::send_announcement(&service, "ssdp:alive").await?;
 
-        info!("Registered UPnP service: {} ({}:{})", service.name, service.address, service.port);
+        info!(
+            "Registered UPnP service: {} ({}:{})",
+            service.name, service.address, service.port
+        );
         Ok(())
     }
 
     async fn unregister_service(&self, service: &ServiceInfo) -> Result<()> {
         let service_id = service.id.to_string();
-        
+
         // Remove from our registered services
         let mut services = self.registered_services.write().await;
         if let Some(service) = services.remove(&service_id) {
             // Send byebye announcement
             Self::send_announcement(&service, "ssdp:byebye").await?;
-            info!("Unregistered UPnP service: {} ({}:{})", service.name, service.address, service.port);
+            info!(
+                "Unregistered UPnP service: {} ({}:{})",
+                service.name, service.address, service.port
+            );
         }
 
         Ok(())
@@ -313,12 +332,18 @@ impl DiscoveryProtocol for SsdpProtocol {
         // For UPnP, check if the service is in our registered services
         let services = self.registered_services.read().await;
         let is_registered = services.contains_key(&service.id.to_string());
-        
+
         if is_registered {
-            debug!("UPnP service verified: {} ({}:{})", service.name, service.address, service.port);
+            debug!(
+                "UPnP service verified: {} ({}:{})",
+                service.name, service.address, service.port
+            );
             Ok(true)
         } else {
-            debug!("UPnP service not found in registered services: {} ({}:{})", service.name, service.address, service.port);
+            debug!(
+                "UPnP service not found in registered services: {} ({}:{})",
+                service.name, service.address, service.port
+            );
             Ok(false)
         }
     }
@@ -354,43 +379,41 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_matching() {
-        let service = ServiceInfo::new(
-            "test-service",
-            "upnp._tcp",
-            8080,
-            None
-        ).unwrap();
-        
+        let service = ServiceInfo::new("test-service", "upnp._tcp", 8080, None).unwrap();
+
         assert!(SsdpProtocol::service_matches_search("ssdp:all", &service));
-        assert!(SsdpProtocol::service_matches_search("upnp:rootdevice", &service));
-        assert!(!SsdpProtocol::service_matches_search("specific:service", &service));
+        assert!(SsdpProtocol::service_matches_search(
+            "upnp:rootdevice",
+            &service
+        ));
+        assert!(!SsdpProtocol::service_matches_search(
+            "specific:service",
+            &service
+        ));
     }
 
     #[tokio::test]
+    #[ignore = "needs real multicast; run with --ignored on a LAN"]
     async fn test_service_registration() {
         let config = DiscoveryConfig::new();
         let protocol = SsdpProtocol::new(config).unwrap();
-        
-        let service = ServiceInfo::new(
-            "test-service",
-            "upnp._tcp",
-            8080,
-            None
-        ).unwrap();
-        
+
+        let service = ServiceInfo::new("test-service", "upnp._tcp", 8080, None).unwrap();
+
         let result = protocol.register_service(service).await;
         assert!(result.is_ok());
     }
 
     #[tokio::test]
+    #[ignore = "needs real multicast; run with --ignored on a LAN"]
     async fn test_service_discovery() {
         let config = DiscoveryConfig::new();
         let protocol = SsdpProtocol::new(config).unwrap();
-        
+
         let service_type = ServiceType::new("upnp._tcp").unwrap();
         let service_types = vec![service_type];
         let timeout = Some(Duration::from_secs(1));
-        
+
         let result = protocol.discover_services(service_types, timeout).await;
         assert!(result.is_ok());
     }

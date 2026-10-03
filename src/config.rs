@@ -1,7 +1,7 @@
 //! Configuration types for service discovery
 
-use crate::types::{ProtocolType, ServiceType, DiscoveryFilter};
 use crate::error::Result;
+use crate::types::{DiscoveryFilter, ProtocolType, ServiceType};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, time::Duration};
 
@@ -423,8 +423,7 @@ mod tests {
 
     #[test]
     fn test_config_builder() -> Result<()> {
-        let config = DiscoveryConfig::new()
-            .with_service_type(ServiceType::new("_http._tcp")?);
+        let config = DiscoveryConfig::new().with_service_type(ServiceType::new("_http._tcp")?);
         assert_eq!(config.service_types().len(), 1);
         Ok(())
     }
@@ -439,14 +438,11 @@ mod tests {
         assert!(config.validate().is_ok());
 
         // Test invalid timeout
-        let invalid_config = DiscoveryConfig::new()
-            .with_timeout(Duration::ZERO);
+        let invalid_config = DiscoveryConfig::new().with_timeout(Duration::ZERO);
         assert!(invalid_config.validate().is_err());
 
         // Test invalid network config
-        let invalid_config = DiscoveryConfig::new()
-            .with_ipv4(false)
-            .with_ipv6(false);
+        let invalid_config = DiscoveryConfig::new().with_ipv4(false).with_ipv6(false);
         assert!(invalid_config.validate().is_err());
 
         Ok(())

@@ -1,13 +1,5 @@
 //! DNS-SD (DNS Service Discovery) protocol implementation
 
-use std::{sync::Arc, time::Duration};
-use async_trait::async_trait;
-use governor::{
-    state::keyed::DefaultKeyedStateStore,
-    clock::DefaultClock,
-    RateLimiter, 
-};
-use trust_dns_client::client::AsyncClient;
 use crate::{
     config::DiscoveryConfig,
     error::{DiscoveryError, Result},
@@ -16,6 +8,10 @@ use crate::{
     service::ServiceInfo,
     types::{ProtocolType, ServiceType},
 };
+use async_trait::async_trait;
+use governor::{RateLimiter, clock::DefaultClock, state::keyed::DefaultKeyedStateStore};
+use std::{sync::Arc, time::Duration};
+use trust_dns_client::client::AsyncClient;
 
 /// DNS-SD (DNS Service Discovery) protocol implementation
 pub struct DnsSdProtocol {
@@ -42,7 +38,7 @@ impl DiscoveryProtocol for DnsSdProtocol {
     async fn discover_services(
         &self,
         _service_types: Vec<ServiceType>,
-        _timeout: Option<Duration>
+        _timeout: Option<Duration>,
     ) -> Result<Vec<ServiceInfo>> {
         // Basic implementation
         Ok(Vec::new())
@@ -71,16 +67,18 @@ impl DiscoveryProtocol for DnsSdProtocol {
 
 impl DnsSdProtocol {
     /// Create a new DNS-SD protocol instance
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `_config` - The discovery configuration (currently unused)
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the DNS client cannot be initialized
     pub async fn new(_config: &DiscoveryConfig) -> Result<Self> {
         // TODO: Implement proper initialization
-        Err(DiscoveryError::protocol("DNS-SD protocol not yet implemented"))
+        Err(DiscoveryError::protocol(
+            "DNS-SD protocol not yet implemented",
+        ))
     }
 }

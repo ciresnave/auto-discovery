@@ -1,9 +1,9 @@
-use criterion::{criterion_group, criterion_main, Criterion};
 use auto_discovery::{
     config::DiscoveryConfig,
     service::ServiceInfo,
     types::{ProtocolType, ServiceType},
 };
+use criterion::{Criterion, criterion_group, criterion_main};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -24,7 +24,8 @@ fn service_creation_benchmark(c: &mut Criterion) {
                 "_http._tcp.local",
                 8080,
                 Some(vec![("version", "1.0"), ("description", "Test service")]),
-            ).unwrap()
+            )
+            .unwrap()
         });
     });
 
@@ -35,7 +36,9 @@ fn service_creation_benchmark(c: &mut Criterion) {
                 "_http._tcp.local",
                 8080,
                 Some(vec![("version", "1.0")]),
-            ).unwrap().with_protocol_type(ProtocolType::Mdns)
+            )
+            .unwrap()
+            .with_protocol_type(ProtocolType::Mdns)
         });
     });
 
@@ -51,9 +54,8 @@ fn service_type_benchmark(c: &mut Criterion) {
     group.sample_size(1000);
 
     group.bench_function("create_service_type", |b| {
-        b.to_async(&rt).iter(|| async {
-            ServiceType::new("_http._tcp.local").unwrap()
-        });
+        b.to_async(&rt)
+            .iter(|| async { ServiceType::new("_http._tcp.local").unwrap() });
     });
 
     group.bench_function("create_upnp_service_type", |b| {
@@ -74,9 +76,8 @@ fn config_benchmark(c: &mut Criterion) {
     group.sample_size(1000);
 
     group.bench_function("create_default_config", |b| {
-        b.to_async(&rt).iter(|| async {
-            DiscoveryConfig::default()
-        });
+        b.to_async(&rt)
+            .iter(|| async { DiscoveryConfig::default() });
     });
 
     group.bench_function("create_custom_config", |b| {

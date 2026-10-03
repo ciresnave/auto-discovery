@@ -7,7 +7,7 @@
 use crate::{
     error::{DiscoveryError, Result},
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
+    types::{ProtocolType, ServiceType},
 };
 use std::{
     collections::HashMap,
@@ -45,7 +45,11 @@ impl ServiceEntry {
     }
 
     /// Create a new service entry for a discovered service
-    pub fn new_discovered(service: ServiceInfo, protocol: ProtocolType, ttl: Option<Duration>) -> Self {
+    pub fn new_discovered(
+        service: ServiceInfo,
+        protocol: ProtocolType,
+        ttl: Option<Duration>,
+    ) -> Self {
         Self {
             service,
             timestamp: Instant::now(),
@@ -66,7 +70,12 @@ impl ServiceEntry {
 
     /// Get the service ID for indexing
     pub fn service_id(&self) -> String {
-        format!("{}:{}:{}", self.service.name(), self.service.service_type(), self.service.port())
+        format!(
+            "{}:{}:{}",
+            self.service.name(),
+            self.service.service_type(),
+            self.service.port()
+        )
     }
 }
 
@@ -86,8 +95,6 @@ pub struct ServiceFilter {
     /// Maximum age of services to include
     pub max_age: Option<Duration>,
 }
-
-
 
 impl ServiceFilter {
     /// Create a new empty filter
@@ -139,10 +146,10 @@ impl ServiceFilter {
         }
 
         // Check max age
-        if let Some(max_age) = self.max_age {
-            if entry.timestamp.elapsed() > max_age {
-                return false;
-            }
+        if let Some(max_age) = self.max_age
+            && entry.timestamp.elapsed() > max_age
+        {
+            return false;
         }
 
         // Check local/discovered filter
@@ -154,24 +161,26 @@ impl ServiceFilter {
         }
 
         // Check service types
-        if let Some(ref types) = self.service_types {
-            if !types.iter().any(|t| t.to_string() == entry.service.service_type().to_string()) {
-                return false;
-            }
+        if let Some(ref types) = self.service_types
+            && !types
+                .iter()
+                .any(|t| t.to_string() == entry.service.service_type().to_string())
+        {
+            return false;
         }
 
         // Check protocols
-        if let Some(ref protocols) = self.protocols {
-            if !protocols.contains(&entry.protocol) {
-                return false;
-            }
+        if let Some(ref protocols) = self.protocols
+            && !protocols.contains(&entry.protocol)
+        {
+            return false;
         }
 
         // Check name contains
-        if let Some(ref name) = self.name_contains {
-            if !entry.service.name().contains(name) {
-                return false;
-            }
+        if let Some(ref name) = self.name_contains
+            && !entry.service.name().contains(name)
+        {
+            return false;
         }
 
         true
@@ -208,13 +217,17 @@ impl ServiceRegistry {
     }
 
     /// Register a local service
-    pub async fn register_local_service(&self, service: ServiceInfo, protocol: ProtocolType) -> Result<()> {
+    pub async fn register_local_service(
+        &self,
+        service: ServiceInfo,
+        protocol: ProtocolType,
+    ) -> Result<()> {
         let entry = ServiceEntry::new_local(service, protocol);
         let service_id = entry.service_id();
-        
+
         let mut services = self.services.write().await;
         services.insert(service_id.clone(), entry);
-        
+
         info!("Registered local service: {}", service_id);
         Ok(())
     }
@@ -232,13 +245,18 @@ impl ServiceRegistry {
     }
 
     /// Add a discovered service
-    pub async fn add_discovered_service(&self, service: ServiceInfo, protocol: ProtocolType, ttl: Option<Duration>) -> Result<()> {
+    pub async fn add_discovered_service(
+        &self,
+        service: ServiceInfo,
+        protocol: ProtocolType,
+        ttl: Option<Duration>,
+    ) -> Result<()> {
         let ttl = ttl.unwrap_or(self.default_ttl);
         let entry = ServiceEntry::new_discovered(service, protocol, Some(ttl));
         let service_id = entry.service_id();
-        
+
         let mut services = self.services.write().await;
-        
+
         // Check if we're at capacity
         if services.len() >= self.max_services {
             // Remove oldest expired service
@@ -246,10 +264,12 @@ impl ServiceRegistry {
                 services.remove(&oldest_expired);
             } else {
                 warn!("Service registry at capacity, cannot add new service");
-                return Err(DiscoveryError::configuration("Service registry at capacity"));
+                return Err(DiscoveryError::configuration(
+                    "Service registry at capacity",
+                ));
             }
         }
-        
+
         services.insert(service_id.clone(), entry);
         debug!("Added discovered service: {}", service_id);
         Ok(())
@@ -258,7 +278,7 @@ impl ServiceRegistry {
     /// Find services matching the given filter
     pub async fn find_services(&self, filter: &ServiceFilter) -> Vec<ServiceInfo> {
         let services = self.services.read().await;
-        
+
         services
             .values()
             .filter(|entry| filter.matches(entry))
@@ -293,7 +313,10 @@ impl ServiceRegistry {
     /// Check if a service is registered locally
     pub async fn is_local_service(&self, service_id: &str) -> bool {
         let services = self.services.read().await;
-        services.get(service_id).map(|entry| entry.is_local).unwrap_or(false)
+        services
+            .get(service_id)
+            .map(|entry| entry.is_local)
+            .unwrap_or(false)
     }
 
     /// Check if a service exists in the registry
@@ -306,37 +329,37 @@ impl ServiceRegistry {
     pub async fn cleanup_expired(&self) -> usize {
         let mut services = self.services.write().await;
         let initial_count = services.len();
-        
+
         services.retain(|_, entry| !entry.is_expired());
-        
+
         let removed_count = initial_count - services.len();
         if removed_count > 0 {
             debug!("Cleaned up {} expired services", removed_count);
         }
-        
+
         removed_count
     }
 
     /// Get registry statistics
     pub async fn stats(&self) -> RegistryStats {
         let services = self.services.read().await;
-        
+
         let mut local_count = 0;
         let mut discovered_count = 0;
         let mut expired_count = 0;
-        
+
         for entry in services.values() {
             if entry.is_local {
                 local_count += 1;
             } else {
                 discovered_count += 1;
             }
-            
+
             if entry.is_expired() {
                 expired_count += 1;
             }
         }
-        
+
         RegistryStats {
             total_services: services.len(),
             local_services: local_count,
@@ -378,18 +401,21 @@ impl Default for ServiceRegistry {
 mod tests {
     use super::*;
     use std::net::{IpAddr, Ipv4Addr};
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     #[tokio::test]
     async fn test_register_and_find_local_service() {
         let registry = ServiceRegistry::new();
-        
+
         let service = ServiceInfo::new("test", "_http._tcp", 8080, None)
             .unwrap()
             .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-        
-        registry.register_local_service(service.clone(), ProtocolType::Mdns).await.unwrap();
-        
+
+        registry
+            .register_local_service(service.clone(), ProtocolType::Mdns)
+            .await
+            .unwrap();
+
         let local_services = registry.get_local_services().await;
         assert_eq!(local_services.len(), 1);
         assert_eq!(local_services[0].name(), service.name());
@@ -398,13 +424,20 @@ mod tests {
     #[tokio::test]
     async fn test_discover_and_find_service() {
         let registry = ServiceRegistry::new();
-        
+
         let service = ServiceInfo::new("discovered", "_http._tcp", 9090, None)
             .unwrap()
             .with_address(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)));
-        
-        registry.add_discovered_service(service.clone(), ProtocolType::Upnp, Some(Duration::from_secs(60))).await.unwrap();
-        
+
+        registry
+            .add_discovered_service(
+                service.clone(),
+                ProtocolType::Upnp,
+                Some(Duration::from_secs(60)),
+            )
+            .await
+            .unwrap();
+
         let discovered_services = registry.get_discovered_services().await;
         assert_eq!(discovered_services.len(), 1);
         assert_eq!(discovered_services[0].name(), service.name());
@@ -413,28 +446,40 @@ mod tests {
     #[tokio::test]
     async fn test_service_filter() {
         let registry = ServiceRegistry::new();
-        
+
         let http_service = ServiceInfo::new("web", "_http._tcp", 80, None)
             .unwrap()
             .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-        
+
         let ssh_service = ServiceInfo::new("ssh", "_ssh._tcp", 22, None)
             .unwrap()
             .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-        
-        registry.register_local_service(http_service.clone(), ProtocolType::Mdns).await.unwrap();
-        registry.add_discovered_service(ssh_service.clone(), ProtocolType::Upnp, Some(Duration::from_secs(60))).await.unwrap();
-        
+
+        registry
+            .register_local_service(http_service.clone(), ProtocolType::Mdns)
+            .await
+            .unwrap();
+        registry
+            .add_discovered_service(
+                ssh_service.clone(),
+                ProtocolType::Upnp,
+                Some(Duration::from_secs(60)),
+            )
+            .await
+            .unwrap();
+
         // Test filter by type
-        let http_services = registry.get_services_by_type(&ServiceType::new("_http._tcp").unwrap()).await;
+        let http_services = registry
+            .get_services_by_type(&ServiceType::new("_http._tcp").unwrap())
+            .await;
         assert_eq!(http_services.len(), 1);
         assert_eq!(http_services[0].name(), "web");
-        
+
         // Test filter by protocol
         let mdns_services = registry.get_services_by_protocol(ProtocolType::Mdns).await;
         assert_eq!(mdns_services.len(), 1);
         assert_eq!(mdns_services[0].name(), "web");
-        
+
         // Test local only filter
         let local_services = registry.get_local_services().await;
         assert_eq!(local_services.len(), 1);
@@ -444,25 +489,32 @@ mod tests {
     #[tokio::test]
     async fn test_service_expiration() {
         let registry = ServiceRegistry::new();
-        
+
         let service = ServiceInfo::new("temp", "_http._tcp", 8080, None)
             .unwrap()
             .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-        
+
         // Add service with very short TTL
-        registry.add_discovered_service(service.clone(), ProtocolType::Mdns, Some(Duration::from_millis(50))).await.unwrap();
-        
+        registry
+            .add_discovered_service(
+                service.clone(),
+                ProtocolType::Mdns,
+                Some(Duration::from_millis(50)),
+            )
+            .await
+            .unwrap();
+
         // Should find service immediately
         let services = registry.get_discovered_services().await;
         assert_eq!(services.len(), 1);
-        
+
         // Wait for expiration
         sleep(Duration::from_millis(100)).await;
-        
+
         // Should not find expired service
         let services = registry.get_discovered_services().await;
         assert_eq!(services.len(), 0);
-        
+
         // Cleanup should remove expired service
         let removed = registry.cleanup_expired().await;
         assert_eq!(removed, 1);

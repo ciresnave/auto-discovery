@@ -1,12 +1,9 @@
 //! Security and verification utilities for service discovery
 
-use crate::{
-    error::Result,
-    service::ServiceInfo,
-};
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use crate::{error::Result, service::ServiceInfo};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 #[cfg(feature = "secure")]
-use ring::signature::{self, KeyPair, Ed25519KeyPair};
+use ring::signature::{self, Ed25519KeyPair, KeyPair};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[allow(dead_code)]
@@ -23,7 +20,7 @@ impl ServiceVerifier {
         let rng = ring::rand::SystemRandom::new();
         let pkcs8_bytes = Ed25519KeyPair::generate_pkcs8(&rng)?;
         let key_pair = Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())?;
-        
+
         Ok(Self { key_pair })
     }
 
@@ -42,9 +39,7 @@ impl ServiceVerifier {
 
         // Verify timestamp is within threshold
         let timestamp = timestamp.parse::<u64>()?;
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_secs();
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
         if now.saturating_sub(timestamp) > 300 {
             return Ok(false);
@@ -57,11 +52,10 @@ impl ServiceVerifier {
         // Verify signature
         match signature::UnparsedPublicKey::new(
             &signature::ED25519,
-            &self.key_pair.public_key().as_ref()
-        ).verify(
-            message.as_bytes(),
-            &signature_bytes,
-        ) {
+            &self.key_pair.public_key().as_ref(),
+        )
+        .verify(message.as_bytes(), &signature_bytes)
+        {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
@@ -69,21 +63,21 @@ impl ServiceVerifier {
 
     /// Generate a signature for a service
     pub fn sign_service(&self, service: &mut ServiceInfo) -> Result<()> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_secs();
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
         service.insert_attribute("timestamp", timestamp.to_string());
 
         let message = self.generate_signing_message(service, timestamp)?;
         let signature = self.key_pair.sign(message.as_bytes());
-        
+
         service.insert_attribute("signature", BASE64.encode(signature.as_ref()));
         Ok(())
     }
 
     fn generate_signing_message(&self, service: &ServiceInfo, timestamp: u64) -> Result<String> {
-        let mut sorted_attrs: Vec<_> = service.attributes.iter()
+        let mut sorted_attrs: Vec<_> = service
+            .attributes
+            .iter()
             .filter(|(k, _)| *k != "signature" && *k != "timestamp")
             .collect();
 
@@ -116,13 +110,9 @@ mod tests {
         let security = ServiceVerifier::new()?;
 
         // Create test service
-        let mut service = ServiceInfo::new(
-            "test_service",
-            "_http._tcp",
-            8080,
-            None
-        ).unwrap()
-        .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        let mut service = ServiceInfo::new("test_service", "_http._tcp", 8080, None)
+            .unwrap()
+            .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
 
         // Sign service
         security.sign_service(&mut service)?;

@@ -1,12 +1,12 @@
 //! DNS Service Discovery example
-//! 
+//!
 //! This example demonstrates DNS-SD protocol usage for service discovery.
 
 use auto_discovery::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
 use std::time::Duration;
 use tracing::info;
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ("version", "1.0"),
             ("protocol", "DNS-SD"),
             ("path", "/api"),
-        ])
+        ]),
     )?;
 
     info!("Registering service: {}", service.name());
@@ -46,10 +46,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Discover DNS-SD services
     info!("Discovering DNS-SD services...");
     let discovered = discovery.discover_services(None).await?;
-    
+
     info!("Found {} DNS-SD services:", discovered.len());
     for service in &discovered {
-        info!("  - {} at {}:{}", service.name(), service.address, service.port);
+        info!(
+            "  - {} at {}:{}",
+            service.name(),
+            service.address,
+            service.port
+        );
         for (key, value) in &service.attributes {
             info!("    {}: {}", key, value);
         }

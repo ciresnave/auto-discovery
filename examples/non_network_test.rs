@@ -1,16 +1,16 @@
 //! Non-network test example that demonstrates the API without requiring real network access
-//! 
+//!
 //! This example shows how to use the library APIs without actually performing network operations,
 //! making it safe to run in any environment.
 
 use auto_discovery::{
+    ServiceDiscovery,
     config::DiscoveryConfig,
     service::ServiceInfo,
-    types::{ServiceType, ProtocolType},
-    ServiceDiscovery,
+    types::{ProtocolType, ServiceType},
 };
-use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
 use tracing::info;
 
 #[tokio::main]
@@ -41,11 +41,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(vec![
             ("version", "1.0"),
             ("description", "Test service for validation"),
-        ])
+        ]),
     )?
     .with_address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
 
-    info!("✅ Service info created: {} on port {}", service.name(), service.port());
+    info!(
+        "✅ Service info created: {} on port {}",
+        service.name(),
+        service.port()
+    );
 
     // Test 3: Service discovery instance creation
     info!("🔍 Testing service discovery creation...");
@@ -55,18 +59,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 4: Quick discovery test with very short timeout
     info!("🔎 Testing quick discovery (with short timeout)...");
     let start_time = std::time::Instant::now();
-    
-    let discovered = discovery
-        .discover_services(Some(ProtocolType::Upnp))
-        .await;
-    
+
+    let discovered = discovery.discover_services(Some(ProtocolType::Upnp)).await;
+
     let elapsed = start_time.elapsed();
     info!("⏱️  Discovery completed in {:?}", elapsed);
 
     match discovered {
         Ok(services) => {
             info!("✅ Discovery succeeded, found {} services", services.len());
-        },
+        }
         Err(e) => {
             info!("ℹ️  Discovery failed as expected (no network): {}", e);
         }
@@ -75,21 +77,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Test 5: Simple API test
     info!("🔧 Testing simple API...");
     use auto_discovery::simple::SimpleDiscovery;
-    
+
     // This should create the service info quickly without network operations
     let start_time = std::time::Instant::now();
     let simple_discovery = SimpleDiscovery::new().await?;
-    let simple_result = simple_discovery.register_http_service("test-api", 3000).await;
+    let simple_result = simple_discovery
+        .register_http_service("test-api", 3000)
+        .await;
     let elapsed = start_time.elapsed();
-    
+
     info!("⏱️  Simple API call completed in {:?}", elapsed);
-    
+
     match simple_result {
         Ok(_handle) => {
             info!("✅ Simple service registration created successfully");
-        },
+        }
         Err(e) => {
-            info!("ℹ️  Simple registration failed as expected (no network): {}", e);
+            info!(
+                "ℹ️  Simple registration failed as expected (no network): {}",
+                e
+            );
         }
     }
 
