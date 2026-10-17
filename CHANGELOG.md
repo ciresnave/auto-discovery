@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - Unreleased
+
+### Changed (CI only)
+
+- **Workflow actions are pinned to full commit SHAs** (tag or branch kept in a
+  trailing comment), and `dtolnay/rust-toolchain` steps now pass an explicit
+  `toolchain` input because a SHA no longer carries the branch name.
+- **Least-privilege workflow permissions**: both workflows default to
+  `contents: read`; only the CD `release` job has `contents: write`.
+- **Added `.github/CODEOWNERS`** (`* @ciresnave`).
+
 ## [0.3.3] - Unreleased
 
 ### Changed (CI only)
