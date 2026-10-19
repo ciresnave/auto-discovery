@@ -1,0 +1,10 @@
+# Declared public API (reachability): each file below holds `pub` items of a `pub` module that this repository's own
+# targets do not call. Kept per file, not as a glob, so a new undeclared file is still reported.
+[reachability]
+public_api = [
+  { file = "src/error.rs", reason = "published API of the auto-discovery crate (crates.io); consumed by downstream crates, not by this repository" },
+  { file = "src/registry.rs", reason = "published API of the auto-discovery crate (crates.io); consumed by downstream crates, not by this repository" },
+  { file = "src/simple.rs", reason = "published API of the auto-discovery crate (crates.io); consumed by downstream crates, not by this repository" },
+  { file = "src/types.rs", reason = "published API of the auto-discovery crate (crates.io); consumed by downstream crates, not by this repository" },
+  { file = "src/utils.rs", reason = "published API of the auto-discovery crate (crates.io); consumed by downstream crates, not by this repository" },
+]
